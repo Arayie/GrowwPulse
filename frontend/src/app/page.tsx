@@ -8,7 +8,7 @@ import { HappinessGraph } from '@/components/HappinessGraph';
 import { UrgencyHeatmap } from '@/components/UrgencyHeatmap';
 import { PlatformDiagnostics } from '@/components/PlatformDiagnostics';
 import { PulseNoteView } from '@/components/PulseNoteView';
-import { RefreshCw, Filter, Sparkles } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 export default function DashboardPage() {
   const [selectedRole, setSelectedRole] = useState<RoleType>('Product');
@@ -44,7 +44,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col w-full max-w-full overflow-x-hidden">
       {/* 1. Animated Market Bar at top */}
       <MarketBar />
 
@@ -55,29 +55,30 @@ export default function DashboardPage() {
       <RoleSelector selectedRole={selectedRole} onSelectRole={handleRoleChange} />
 
       {/* Main Dashboard Content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6 overflow-x-hidden">
         {/* Dashboard Control Strip */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#111827] border border-[#1f293d] rounded-xl p-4 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#111827] border border-[#1f293d] rounded-xl p-4 sm:p-5 shadow-lg">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-slate-100">Executive Insights Dashboard</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-slate-100">Executive Insights Dashboard</h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#00d09c]/10 text-[#00d09c] border border-[#00d09c]/30">
                 {selectedRole} Mode
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-1">
               Week 17 • 880 Reviews Pre-Clustered for {selectedRole} Lens
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="w-full sm:w-auto flex items-center">
             <button
+              type="button"
               onClick={() => fetchRoleReport(selectedRole)}
               disabled={isLoading}
-              className="flex items-center gap-1.5 text-xs text-slate-300 bg-[#1f293d] hover:bg-slate-700 hover:text-white px-3.5 py-2 rounded-lg border border-slate-700 transition disabled:opacity-50"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 text-xs font-semibold text-slate-100 bg-[#00d09c]/10 hover:bg-[#00d09c]/20 text-[#00d09c] border border-[#00d09c]/40 px-4 py-2.5 rounded-xl transition cursor-pointer touch-manipulation active:scale-95 transition-transform relative z-10 shadow-md disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-[#00d09c]' : ''}`} />
-              Re-Cluster & Generate
+              <RefreshCw className={`w-4 h-4 text-[#00d09c] ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Re-Cluster & Generate</span>
             </button>
           </div>
         </div>

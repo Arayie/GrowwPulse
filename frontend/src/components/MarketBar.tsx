@@ -26,7 +26,7 @@ export const MarketBar: React.FC = () => {
   const tickerItems = [...marketIndices, ...marketIndices];
 
   return (
-    <div className="w-full bg-slate-950 border-b border-[#1f293d] overflow-hidden py-2 select-none">
+    <div className="w-full max-w-full bg-slate-950 border-b border-[#1f293d] overflow-hidden py-2 select-none">
       <div className="animate-marquee">
         {tickerItems.map((item, idx) => (
           <div

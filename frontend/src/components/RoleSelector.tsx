@@ -21,24 +21,25 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   ];
 
   return (
-    <div className="w-full bg-[#111827] border-b border-[#1f293d] py-3 px-6 shadow-md">
+    <div className="w-full max-w-full bg-[#111827] border-b border-[#1f293d] py-3 px-4 sm:px-6 shadow-md overflow-x-hidden">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start sm:self-center">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
             Select Perspective:
           </span>
         </div>
 
         {/* Pill-based Toggle Menu */}
-        <div className="flex items-center gap-2 bg-[#0b0f19] p-1.5 rounded-xl border border-[#1f293d] w-full sm:w-auto overflow-x-auto">
+        <div className="flex items-center gap-2 bg-[#0b0f19] p-1.5 rounded-xl border border-[#1f293d] w-full sm:w-auto overflow-x-auto no-scrollbar">
           {roles.map((r) => {
             const Icon = r.icon;
             const isSelected = selectedRole === r.id;
             return (
               <button
                 key={r.id}
+                type="button"
                 onClick={() => onSelectRole(r.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 touch-manipulation active:scale-95 transition-transform ${
                   isSelected
                     ? 'bg-[#00d09c] text-slate-950 shadow-md shadow-[#00d09c]/20 font-bold'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-[#1f293d]/50'
