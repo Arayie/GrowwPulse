@@ -37,7 +37,7 @@ from email.message import EmailMessage
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with generate_pdf_sync Base64 Data URI & HTML Markdown Parsing")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with File URI Chart Rendering & Hardcoded Section Titles")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -75,45 +75,42 @@ def generate_role_report(role: str) -> str:
     
     if 'product' in role_lower or 'growth' in role_lower:
         return (
-            "## Top 3 Themes\n"
             "1. **Double SIP AutoPay Mandate Duplication**: Recurring payment microservice executing SIP mandates twice in a month without authorization.\n"
             "2. **iOS Candlestick Chart Freezes during Peak F&O**: Post-update UI regression causing charts to freeze on iOS during opening market hours.\n"
             "3. **Bank Account & Mandate Validation Stalls**: Multi-day delays in bank account verification blocking fund deposits.\n\n"
-            "## Real User Quotes\n"
+            "---\n"
             "> \"SIP amount deducted twice this month. Double deduction happened without any reason. User [EMAIL REDACTED] ticket unresolved.\"\n"
             "> \"Latest update freezes option charts on iOS. Screen goes blank during fast market moves for account [ID REDACTED].\"\n"
             "> \"Bank verification stuck for 5 days. Cannot set up AutoPay mandate. Contacted support at [EMAIL REDACTED].\"\n\n"
-            "## Action Ideas\n"
+            "---\n"
             "- **Product/Growth**: Build an automated mandate deduplication engine in payment backend services to block double debits.\n"
             "- **Support**: Deploy hotfix patch optimizing iOS chart rendering pipeline and WebSocket data stream buffers.\n"
             "- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks."
         )
     elif 'support' in role_lower:
         return (
-            "## Top 3 Themes\n"
             "1. **Withdrawal Tickets Stalled over 5 Days**: High volume of user escalations regarding locked funds and unacknowledged support tickets.\n"
             "2. **Unresolved CS Tickets (7+ Days Inactive)**: Users reporting long response latency and automated bot loops with no human agent resolution.\n"
             "3. **Silent Payment Failures without SMS Triggers**: Bank account debited for investments showing failed status without status tracking.\n\n"
-            "## Real User Quotes\n"
+            "---\n"
             "> \"Withdrawal pending for 5 days. Urgently need money but no response from support team or phone [PHONE REDACTED].\"\n"
             "> \"Raised ticket 7 days ago regarding failed transaction. No response received from email [EMAIL REDACTED]. Very poor service.\"\n"
             "> \"Money deducted from bank but investment not done. Transaction shows failed status. Contacted [EMAIL REDACTED].\"\n\n"
-            "## Action Ideas\n"
+            "---\n"
             "- **Product/Growth**: Deploy automated WhatsApp and SMS status tracking triggers for failed or processing transactions.\n"
             "- **Support**: Establish a 24/7 priority escalation desk for withdrawal tickets pending over 48 hours.\n"
             "- **Leadership**: Update CS playbooks to enable instant wallet provisional credits for verified double SIP debits."
         )
     else:
         return (
-            "## Top 3 Themes\n"
             "1. **Public Store Brand & Rating Risk**: Surge in 1-star App Store/Play Store reviews impacting public rating due to payment issues.\n"
             "2. **Partner Bank Payment Gateway Latency**: Banking partner gateway timeouts causing transaction processing stalls and refund delays.\n"
             "3. **High-LTV F&O Trader Churn Risk**: Peak trading hour latencies causing user dissatisfaction among active traders.\n\n"
-            "## Real User Quotes\n"
+            "---\n"
             "> \"Order failed twice during market peak at 9:15 AM! Stop-loss didn’t trigger. Account [ID REDACTED] unresolved.\"\n"
             "> \"Groww used to be great but latest payment issues are terrible. Moving my portfolio to another broker.\"\n"
             "> \"Double deduction happened twice. Unacceptable for a financial app managing user funds. User [EMAIL REDACTED].\"\n\n"
-            "## Action Ideas\n"
+            "---\n"
             "- **Product/Growth**: Authorize emergency engineering resource allocation to scale peak opening-hour trading engine capacity.\n"
             "- **Support**: Audit AutoPay mandate clearing mechanisms against regulatory RBI guidelines.\n"
             "- **Leadership**: Renegotiate SLA parameters and instant refund webhook requirements with primary payment gateway partners."
@@ -176,7 +173,7 @@ def cluster_reviews(df: pd.DataFrame, num_clusters: int = 5) -> Tuple[pd.DataFra
 
 # Exact generate_pdf_sync implementation
 def generate_pdf_sync(role: str, themes: str, quotes: str, action_ideas: str) -> str:
-    # 1. Generate the Graph
+    # 1. Save Graph to Temp File (Bypasses Base64 blocking)
     plt.figure(figsize=(7, 3.5), dpi=300)
     categories = ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support']
     scores = [82, 60, 91, 85, 74]
@@ -184,18 +181,17 @@ def generate_pdf_sync(role: str, themes: str, quotes: str, action_ideas: str) ->
     plt.title(f'{role} Team: Platform Diagnostics', color='#1a1a1a')
     plt.tight_layout()
     
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', transparent=True)
-    buf.seek(0)
-    graph_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    temp_dir = tempfile.gettempdir()
+    chart_path = os.path.join(temp_dir, "pulse_chart.png")
+    plt.savefig(chart_path, format='png', transparent=True)
     plt.close()
 
-    # 2. Parse Raw Markdown into HTML
+    # 2. Parse Raw Markdown
     themes_html = markdown.markdown(themes) if themes else ""
     quotes_html = markdown.markdown(quotes) if quotes else ""
     action_html = markdown.markdown(action_ideas) if action_ideas else ""
 
-    # 3. Build the Branded PDF Template
+    # 3. Build HTML with Hardcoded Subtitles
     pdf_html = f"""
     <html>
     <head>
@@ -203,7 +199,8 @@ def generate_pdf_sync(role: str, themes: str, quotes: str, action_ideas: str) ->
             body {{ font-family: Helvetica, Arial, sans-serif; color: #1a1a1a; padding: 40px; }}
             .header {{ border-bottom: 3px solid #00d09c; padding-bottom: 10px; margin-bottom: 30px; }}
             h1 {{ color: #1a1a1a; font-size: 28px; margin: 0; }}
-            h2, h3 {{ color: #1a1a1a; font-size: 20px; margin-top: 30px; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }}
+            h2.main-title {{ color: #00d09c; font-size: 20px; margin-top: 5px; }}
+            h3.section-title {{ color: #1a1a1a; font-size: 18px; margin-top: 25px; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }}
             .graph {{ text-align: center; margin: 30px 0; }}
             img {{ width: 100%; max-width: 500px; display: block; margin: 0 auto; border-radius: 8px; }}
             .content p, .content li {{ line-height: 1.6; font-size: 14px; margin-bottom: 10px; }}
@@ -213,14 +210,17 @@ def generate_pdf_sync(role: str, themes: str, quotes: str, action_ideas: str) ->
     <body>
         <div class="header">
             <h1>Groww <span style="font-weight: normal; color: #64748b;">pulse</span></h1>
-            <h2 style="color: #00d09c; border: none; margin-top: 5px;">Weekly Insights Report: {role} Team</h2>
+            <h2 class="main-title">Weekly Insights Report: {role} Team</h2>
         </div>
         <div class="graph">
-            <img src="data:image/png;base64,{graph_base64}" />
+            <img src="file://{chart_path}" />
         </div>
         <div class="content">
+            <h3 class="section-title">Top 3 Themes</h3>
             {themes_html}
+            <h3 class="section-title">Real User Quotes</h3>
             {quotes_html}
+            <h3 class="section-title">Action Ideas</h3>
             {action_html}
         </div>
     </body>
@@ -229,10 +229,10 @@ def generate_pdf_sync(role: str, themes: str, quotes: str, action_ideas: str) ->
     
     exports_dir = os.path.join(base_dir, "exports")
     os.makedirs(exports_dir, exist_ok=True)
-    filepath = os.path.join(exports_dir, "Weekly_Pulse.pdf")
+    pdf_path = os.path.join(exports_dir, "Weekly_Pulse.pdf")
     try:
         from weasyprint import HTML
-        HTML(string=pdf_html, base_url="/tmp/").write_pdf(filepath)
+        HTML(string=pdf_html).write_pdf(pdf_path)
     except Exception:
         from fpdf import FPDF
         pdf = FPDF()
@@ -246,9 +246,9 @@ def generate_pdf_sync(role: str, themes: str, quotes: str, action_ideas: str) ->
             line_str = line.strip().encode('ascii', errors='ignore').decode('ascii')
             if line_str:
                 pdf.multi_cell(190, 6, txt=line_str)
-        pdf.output(filepath)
+        pdf.output(pdf_path)
 
-    return filepath
+    return pdf_path
 
 def generate_pdf(
     md_text: str,
@@ -259,11 +259,11 @@ def generate_pdf(
     action_ideas: Optional[str] = None
 ) -> str:
     if not themes:
-        themes = "## Top 3 Themes\n1. Double SIP AutoPay Mandate Duplication (159 reports)\n2. iOS Candlestick Chart Freezes during Peak F&O\n3. Bank Account & Mandate Validation Stalls (158 reports)"
+        themes = "1. Double SIP AutoPay Mandate Duplication (159 reports)\n2. iOS Candlestick Chart Freezes during Peak F&O\n3. Bank Account & Mandate Validation Stalls (158 reports)"
     if not quotes:
-        quotes = "## Real User Quotes\n> \"SIP amount deducted twice this month. User [EMAIL REDACTED] ticket unresolved.\"\n> \"Latest update freezes option charts on iOS. Account [ID REDACTED].\"\n> \"Bank verification stuck for 5 days. Contacted support at [EMAIL REDACTED].\""
+        quotes = "> \"SIP amount deducted twice this month. User [EMAIL REDACTED] ticket unresolved.\"\n> \"Latest update freezes option charts on iOS. Account [ID REDACTED].\"\n> \"Bank verification stuck for 5 days. Contacted support at [EMAIL REDACTED].\""
     if not action_ideas:
-        action_ideas = "## Action Ideas\n- **Product/Growth**: Build an automated mandate deduplication engine.\n- **Support**: Establish a 24/7 priority escalation desk.\n- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks."
+        action_ideas = "- **Product/Growth**: Build an automated mandate deduplication engine.\n- **Support**: Establish a 24/7 priority escalation desk.\n- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks."
 
     return generate_pdf_sync(role, themes, quotes, action_ideas)
 
@@ -306,7 +306,7 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "Exact generate_pdf_sync Base64 Data URI & HTML Markdown Parsing"
+        "phase": "File URI Chart Rendering + Hardcoded Section Titles"
     }
 
 @app.post("/test-sanitization")
@@ -368,10 +368,9 @@ async def send_pulse_email(request: SendEmailRequest):
         df_clean = load_and_clean_csv("reviews.csv")
         df_clustered, cluster_summary = cluster_reviews(df_clean, num_clusters=5)
         
-        default_report = generate_role_report(request.role)
-        themes_input = request.themes if request.themes else "## Top 3 Themes\n1. Double SIP AutoPay Mandate Duplication\n2. iOS Candlestick Chart Freezes\n3. Bank Account Validation Stalls"
-        quotes_input = request.quotes if request.quotes else "## Real User Quotes\n> \"SIP amount deducted twice this month.\""
-        action_input = request.action_ideas if request.action_ideas else "## Action Ideas\n- **Product/Growth**: Build mandate deduplication engine."
+        themes_input = request.themes if request.themes else "1. Double SIP AutoPay Mandate Duplication\n2. iOS Candlestick Chart Freezes\n3. Bank Account Validation Stalls"
+        quotes_input = request.quotes if request.quotes else "> \"SIP amount deducted twice this month.\""
+        action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
 
         pdf_path = await asyncio.to_thread(
             generate_pdf_sync,
@@ -381,7 +380,7 @@ async def send_pulse_email(request: SendEmailRequest):
             action_input
         )
         
-        bold_header_style = 'font-weight: bold; font-size: 24px; color: #1a1a1a; margin-top: 20px; margin-bottom: 8px; border-left: 4px solid #00d09c; padding-left: 8px;'
+        bold_header_style = 'font-weight: bold; font-size: 20px; color: #1a1a1a; margin-top: 20px; margin-bottom: 8px; border-bottom: 2px solid #00d09c; padding-bottom: 4px;'
         
         themes_html = markdown.markdown(themes_input)
         quotes_html = markdown.markdown(quotes_input)
@@ -401,6 +400,7 @@ async def send_pulse_email(request: SendEmailRequest):
     .greeting {{ font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 8px; }}
     .punchy-intro {{ font-size: 13px; color: #64748b; margin-bottom: 16px; font-weight: 500; }}
     .report-card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 16px 0; color: #1e293b; }}
+    .section-title {{ color: #1a1a1a; font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 8px; border-bottom: 2px solid #00d09c; padding-bottom: 4px; }}
     .attachment-note {{ background: rgba(0, 208, 156, 0.1); border: 1px solid rgba(0, 208, 156, 0.3); color: #008765; padding: 12px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-top: 18px; text-align: center; }}
     .email-footer {{ background: #f8fafc; padding: 14px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }}
   </style>
@@ -415,9 +415,14 @@ async def send_pulse_email(request: SendEmailRequest):
       <div class="punchy-intro">Here is your visual weekly pulse report tailored for the {request.role} team.</div>
       
       <div class="report-card">
-        {themes_html}
-        {quotes_html}
-        {action_ideas_html}
+        <h3 class="section-title">Top 3 Themes</h3>
+        <div>{themes_html}</div>
+
+        <h3 class="section-title">Real User Quotes</h3>
+        <div style="font-style: italic;">{quotes_html}</div>
+
+        <h3 class="section-title">Action Ideas</h3>
+        <div>{action_ideas_html}</div>
       </div>
 
       <div class="attachment-note">
