@@ -9,7 +9,7 @@ import smtplib
 import pandas as pd
 from datetime import datetime, date
 from typing import Optional, Tuple, Dict, List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -38,7 +38,7 @@ from email.message import EmailMessage
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Redesigned PDF Template & Strict Markdown Bullet Formatting")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Non-Blocking FastAPI BackgroundTasks Email Pipeline & SMTP Timeouts")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -192,7 +192,6 @@ def get_role_directive(role: str) -> str:
     else:
         return ROLE_DIRECTIVES['Leadership']
 
-# Step 1: Enforce Strict Bullet Point Formatting in Data Generation
 def generate_role_report(role: str, week_id: str = "17") -> str:
     is_locked, unlock_date = check_week_lock_status(week_id)
     if is_locked:
@@ -262,7 +261,6 @@ def cluster_reviews(df: pd.DataFrame, num_clusters: int = 5) -> Tuple[pd.DataFra
     formatted_summary = "\n".join(cluster_summary_lines)
     return df_clustered, formatted_summary
 
-# Helper to format any incoming markdown text strictly into bullet items
 def format_as_bullets(text: str) -> str:
     if not text:
         return ""
@@ -279,7 +277,6 @@ def format_as_bullets(text: str) -> str:
             bullet_lines.append(line_str)
     return "\n".join(bullet_lines)
 
-# Step 2: Overhaul PDF HTML/CSS Template in generate_pdf_sync
 def generate_pdf_sync(
     role: str,
     themes: str,
@@ -291,7 +288,6 @@ def generate_pdf_sync(
     categories = chart_categories if (chart_categories and len(chart_categories) > 0) else ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support']
     scores = chart_scores if (chart_scores and len(chart_scores) > 0) else [82, 60, 91, 85, 74]
 
-    # 1. Save Graph to Temp File
     plt.figure(figsize=(7, 3.5), dpi=300)
     plt.bar(categories, scores, color='#00d09c')
     plt.ylim(0, 100)
@@ -303,7 +299,6 @@ def generate_pdf_sync(
     plt.savefig(chart_path, format='png', transparent=True)
     plt.close()
 
-    # Parse and enforce markdown bullet formatting
     themes_bulleted = format_as_bullets(themes)
     quotes_bulleted = format_as_bullets(quotes)
     action_bulleted = format_as_bullets(action_ideas)
@@ -312,34 +307,24 @@ def generate_pdf_sync(
     quotes_html = markdown.markdown(quotes_bulleted)
     action_html = markdown.markdown(action_bulleted)
 
-    # 2. Premium Branded PDF HTML/CSS Template
     pdf_html = f"""
     <html>
     <head>
         <style>
             @page {{ size: A4; margin: 18mm; }}
             body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; padding: 0; margin: 0; line-height: 1.6; }}
-            
-            /* Branded Logo Header */
             .header-container {{ border-bottom: 3px solid #00d09c; padding-bottom: 14px; margin-bottom: 22px; }}
             .brand-logo {{ font-size: 32px; font-weight: 800; color: #00d09c; letter-spacing: -0.5px; margin: 0; display: inline-block; }}
             .brand-logo-accent {{ font-weight: 300; color: #64748b; font-size: 28px; margin-left: 4px; }}
             .report-title {{ font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 6px; margin-bottom: 0; text-transform: uppercase; letter-spacing: 0.5px; }}
             .report-subtitle {{ font-size: 12px; color: #64748b; margin-top: 2px; font-weight: 500; }}
-
-            /* Chart Styling */
             .graph-container {{ text-align: center; margin: 18px 0; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; }}
             img {{ width: 100%; max-width: 500px; display: block; margin: 0 auto; border-radius: 6px; }}
-
-            /* Section Headers */
             h3.section-title {{ font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 20px; margin-bottom: 10px; border-left: 4px solid #00d09c; padding-left: 10px; text-transform: uppercase; letter-spacing: 0.5px; }}
-
-            /* Custom Emerald Bullet Lists */
             ul {{ margin: 8px 0 16px 0; padding-left: 18px; list-style-type: none; }}
             ul li {{ position: relative; padding-left: 14px; margin-bottom: 8px; font-size: 13px; color: #334155; line-height: 1.6; }}
             ul li::before {{ content: "•"; position: absolute; left: 0; color: #00d09c; font-size: 18px; line-height: 1; top: -1px; font-weight: bold; }}
             ul li strong {{ color: #0f172a; font-weight: 600; }}
-
             .footer-note {{ margin-top: 28px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 10px; color: #94a3b8; text-align: center; }}
         </style>
     </head>
@@ -414,22 +399,129 @@ def generate_pdf(
 
     return generate_pdf_sync(role, themes, quotes, action_ideas, chart_categories, chart_scores)
 
+# Step 2: Explicit Timeouts (15s) & Verbose Logging for SMTP
 def send_smtp_dispatch(msg: EmailMessage) -> str:
     smtp_email = os.environ.get("SMTP_EMAIL")
     smtp_password = os.environ.get("SMTP_PASSWORD")
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.environ.get("SMTP_PORT", 465))
     
+    print(f"[SMTP ENGINE] Connecting to SMTP server {smtp_server}:{smtp_port} (timeout=15s)...")
     if smtp_email and smtp_password:
         try:
-            with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+            with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15) as server:
                 server.login(smtp_email, smtp_password)
                 server.send_message(msg)
+            print("[SMTP ENGINE] Live Branded HTML email dispatched successfully via SMTP SSL!")
             return "Live Branded HTML email sent successfully via SMTP!"
         except Exception as smtp_err:
+            print(f"[SMTP ENGINE ERROR] SMTP dispatch failed/timed out: {str(smtp_err)}")
             return f"Branded HTML Email drafted & PDF attached (SMTP attempt: {str(smtp_err)})"
     else:
+        print("[SMTP ENGINE] SMTP credentials not set in .env. Drafted email & PDF ready.")
         return "Branded HTML Email drafted & PDF generated successfully! (Add SMTP_EMAIL and SMTP_PASSWORD to .env for live sending)"
+
+# Step 1: Background Worker Function for FastAPI BackgroundTasks
+def process_email_in_background(
+    role: str,
+    email: str,
+    themes: str,
+    quotes: str,
+    action_ideas: str,
+    chart_categories: Optional[List[str]] = None,
+    chart_scores: Optional[List[int]] = None
+):
+    print(f"[BACKGROUND TASK START] Starting PDF generation for role: '{role}'...")
+    try:
+        pdf_path = generate_pdf_sync(
+            role,
+            themes,
+            quotes,
+            action_ideas,
+            chart_categories,
+            chart_scores
+        )
+        print(f"[BACKGROUND TASK SUCCESS] PDF generated successfully at path: {pdf_path}")
+        
+        themes_bulleted = format_as_bullets(themes)
+        quotes_bulleted = format_as_bullets(quotes)
+        action_bulleted = format_as_bullets(action_ideas)
+
+        themes_html = markdown.markdown(themes_bulleted)
+        quotes_html = markdown.markdown(quotes_bulleted)
+        action_ideas_html = markdown.markdown(action_bulleted)
+
+        email_html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }}
+    .email-container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }}
+    .email-header {{ background-color: #1a1a1a; padding: 20px 24px; border-bottom: 3px solid #00d09c; }}
+    .brand-title {{ font-size: 24px; font-weight: 800; color: #00d09c; margin: 0; letter-spacing: -0.5px; }}
+    .brand-accent {{ color: #ffffff; font-weight: 300; font-size: 20px; margin-left: 4px; }}
+    .email-body {{ padding: 24px; font-size: 13px; line-height: 1.6; color: #334155; }}
+    .greeting {{ font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 8px; }}
+    .punchy-intro {{ font-size: 13px; color: #64748b; margin-bottom: 16px; font-weight: 500; }}
+    .report-card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 16px 0; color: #1e293b; }}
+    .section-title {{ color: #0f172a; font-size: 14px; font-weight: 700; margin-top: 18px; margin-bottom: 8px; border-left: 3px solid #00d09c; padding-left: 8px; text-transform: uppercase; }}
+    ul {{ margin: 6px 0; padding-left: 16px; list-style-type: none; }}
+    ul li {{ position: relative; padding-left: 12px; margin-bottom: 6px; font-size: 13px; color: #334155; }}
+    ul li::before {{ content: "•"; position: absolute; left: 0; color: #00d09c; font-weight: bold; }}
+    .attachment-note {{ background: rgba(0, 208, 156, 0.1); border: 1px solid rgba(0, 208, 156, 0.3); color: #008765; padding: 12px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-top: 18px; text-align: center; }}
+    .email-footer {{ background: #f8fafc; padding: 14px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }}
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <div class="brand-title">Groww<span class="brand-accent">pulse</span></div>
+    </div>
+    <div class="email-body">
+      <div class="greeting">Hello {role} Team,</div>
+      <div class="punchy-intro">Here is your visual weekly pulse report tailored for the {role} team.</div>
+      
+      <div class="report-card">
+        <div class="section-title">Top 3 Themes</div>
+        <div>{themes_html}</div>
+
+        <div class="section-title">Real User Quotes</div>
+        <div>{quotes_html}</div>
+
+        <div class="section-title">Action Ideas</div>
+        <div>{action_ideas_html}</div>
+      </div>
+
+      <div class="attachment-note">
+        📎 Please find your detailed, visual Weekly Pulse report attached as a PDF document.
+      </div>
+    </div>
+    <div class="email-footer">
+      Sent automatically by Groww Pulse AI Insights Engine • 100% Zero PII Sanitized
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+        msg = EmailMessage()
+        msg['Subject'] = f"Your Groww Pulse Weekly Report - {role} Team"
+        msg['From'] = os.environ.get("SMTP_EMAIL", "pulse-insights@groww.in")
+        msg['To'] = email
+        
+        msg.set_content(email_html_body, subtype='html')
+        
+        if os.path.exists(pdf_path):
+            with open(pdf_path, 'rb') as f:
+                file_data = f.read()
+                msg.add_attachment(file_data, maintype='application', subtype='pdf', filename='Weekly_Pulse.pdf')
+                
+        print(f"[BACKGROUND TASK] Initiating SMTP dispatch for target: {email}...")
+        dispatch_status = send_smtp_dispatch(msg)
+        print(f"[BACKGROUND TASK FINISHED] Dispatch status result: '{dispatch_status}'")
+    except Exception as bg_err:
+        print(f"[BACKGROUND TASK ERROR] Exception raised during background execution: {str(bg_err)}")
 
 class WeeklyPulseRequest(BaseModel):
     role: Optional[str] = "Lead Insights Analyst"
@@ -456,7 +548,7 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "Redesigned Branded PDF Template + Strict Markdown Bullet Formatting"
+        "phase": "FastAPI BackgroundTasks Email Pipeline + 15s SMTP Timeouts"
     }
 
 @app.get("/api/weeks")
@@ -569,8 +661,9 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
         "report": report_text
     }
 
+# Step 1: Non-Blocking BackgroundTasks Endpoint
 @app.post("/api/send-pulse-email")
-async def send_pulse_email(request: SendEmailRequest):
+async def send_pulse_email(request: SendEmailRequest, background_tasks: BackgroundTasks):
     week_id = request.week_id or "17"
     is_locked, unlock_date = check_week_lock_status(week_id)
     if is_locked:
@@ -579,103 +672,26 @@ async def send_pulse_email(request: SendEmailRequest):
             detail=f"Week {week_id} report is chronologically time-gated and will unlock on {unlock_date}."
         )
 
-    try:
-        themes_input = request.themes if request.themes else "- **Double SIP AutoPay Mandate Duplication**\n- **iOS Candlestick Chart Freezes**\n- **Bank Account Validation Stalls**"
-        quotes_input = request.quotes if request.quotes else "- \"SIP amount deducted twice this month.\""
-        action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
+    themes_input = request.themes if request.themes else "- **Double SIP AutoPay Mandate Duplication**\n- **iOS Candlestick Chart Freezes**\n- **Bank Account Validation Stalls**"
+    quotes_input = request.quotes if request.quotes else "- \"SIP amount deducted twice this month.\""
+    action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
 
-        pdf_path = await asyncio.to_thread(
-            generate_pdf_sync,
-            request.role,
-            themes_input,
-            quotes_input,
-            action_input,
-            request.chart_categories,
-            request.chart_scores
-        )
-        
-        themes_bulleted = format_as_bullets(themes_input)
-        quotes_bulleted = format_as_bullets(quotes_input)
-        action_bulleted = format_as_bullets(action_input)
+    print(f"[API ENDPOINT] Enqueuing background email task for {request.email} ({request.role} lens)...")
+    background_tasks.add_task(
+        process_email_in_background,
+        request.role,
+        request.email,
+        themes_input,
+        quotes_input,
+        action_input,
+        request.chart_categories,
+        request.chart_scores
+    )
 
-        themes_html = markdown.markdown(themes_bulleted)
-        quotes_html = markdown.markdown(quotes_bulleted)
-        action_ideas_html = markdown.markdown(action_bulleted)
-
-        email_html_body = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }}
-    .email-container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }}
-    .email-header {{ background-color: #1a1a1a; padding: 20px 24px; border-bottom: 3px solid #00d09c; }}
-    .brand-title {{ font-size: 24px; font-weight: 800; color: #00d09c; margin: 0; letter-spacing: -0.5px; }}
-    .brand-accent {{ color: #ffffff; font-weight: 300; font-size: 20px; margin-left: 4px; }}
-    .email-body {{ padding: 24px; font-size: 13px; line-height: 1.6; color: #334155; }}
-    .greeting {{ font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 8px; }}
-    .punchy-intro {{ font-size: 13px; color: #64748b; margin-bottom: 16px; font-weight: 500; }}
-    .report-card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 16px 0; color: #1e293b; }}
-    .section-title {{ color: #0f172a; font-size: 14px; font-weight: 700; margin-top: 18px; margin-bottom: 8px; border-left: 3px solid #00d09c; padding-left: 8px; text-transform: uppercase; }}
-    ul {{ margin: 6px 0; padding-left: 16px; list-style-type: none; }}
-    ul li {{ position: relative; padding-left: 12px; margin-bottom: 6px; font-size: 13px; color: #334155; }}
-    ul li::before {{ content: "•"; position: absolute; left: 0; color: #00d09c; font-weight: bold; }}
-    .attachment-note {{ background: rgba(0, 208, 156, 0.1); border: 1px solid rgba(0, 208, 156, 0.3); color: #008765; padding: 12px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-top: 18px; text-align: center; }}
-    .email-footer {{ background: #f8fafc; padding: 14px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }}
-  </style>
-</head>
-<body>
-  <div class="email-container">
-    <div class="email-header">
-      <div class="brand-title">Groww<span class="brand-accent">pulse</span></div>
-    </div>
-    <div class="email-body">
-      <div class="greeting">Hello {request.role} Team,</div>
-      <div class="punchy-intro">Here is your visual weekly pulse report tailored for the {request.role} team.</div>
-      
-      <div class="report-card">
-        <div class="section-title">Top 3 Themes</div>
-        <div>{themes_html}</div>
-
-        <div class="section-title">Real User Quotes</div>
-        <div>{quotes_html}</div>
-
-        <div class="section-title">Action Ideas</div>
-        <div>{action_ideas_html}</div>
-      </div>
-
-      <div class="attachment-note">
-        📎 Please find your detailed, visual Weekly Pulse report attached as a PDF document.
-      </div>
-    </div>
-    <div class="email-footer">
-      Sent automatically by Groww Pulse AI Insights Engine • 100% Zero PII Sanitized
-    </div>
-  </div>
-</body>
-</html>
-"""
-
-        msg = EmailMessage()
-        msg['Subject'] = f"Your Groww Pulse Weekly Report - {request.role} Team"
-        msg['From'] = os.environ.get("SMTP_EMAIL", "pulse-insights@groww.in")
-        msg['To'] = request.email
-        
-        msg.set_content(email_html_body, subtype='html')
-        
-        if os.path.exists(pdf_path):
-            with open(pdf_path, 'rb') as f:
-                file_data = f.read()
-                msg.add_attachment(file_data, maintype='application', subtype='pdf', filename='Weekly_Pulse.pdf')
-                
-        dispatch_status = await asyncio.to_thread(send_smtp_dispatch, msg)
-
-        return {
-            "status": "success",
-            "message": dispatch_status,
-            "pdf_path": pdf_path,
-            "target_email": request.email,
-            "role": request.role
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process email automation: {str(e)}")
+    return {
+        "status": "success",
+        "message": "Email delivery & PDF generation task enqueued successfully in background!",
+        "target_email": request.email,
+        "role": request.role,
+        "week_id": week_id
+    }
