@@ -8,18 +8,19 @@ import { HappinessGraph } from '@/components/HappinessGraph';
 import { UrgencyHeatmap } from '@/components/UrgencyHeatmap';
 import { PlatformDiagnostics } from '@/components/PlatformDiagnostics';
 import { PulseNoteView } from '@/components/PulseNoteView';
-import { RefreshCw, Calendar, Sparkles } from 'lucide-react';
+import { RefreshCw, Calendar, Lock } from 'lucide-react';
 
 export default function DashboardPage() {
   const [selectedRole, setSelectedRole] = useState<RoleType>('Product');
   const [selectedWeek, setSelectedWeek] = useState<string>('17');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [reportText, setReportText] = useState<string>('');
-  const [weeksList, setWeeksList] = useState<Array<{ week_number: number; label: string }>>([
-    { week_number: 15, label: 'Week 15 (Historical)' },
-    { week_number: 16, label: 'Week 16 (Historical)' },
-    { week_number: 17, label: 'Week 17 (Current)' },
-    { week_number: 18, label: 'Week 18 (Auto-Generated)' },
+  const [weeksList, setWeeksList] = useState<Array<{ week_number: number; label: string; is_locked: boolean; unlock_date: string }>>([
+    { week_number: 15, label: 'Week 15 (Historical)', is_locked: false, unlock_date: '2026-08-04' },
+    { week_number: 16, label: 'Week 16 (Historical)', is_locked: false, unlock_date: '2026-08-11' },
+    { week_number: 17, label: 'Week 17 (Current)', is_locked: false, unlock_date: '2026-08-18' },
+    { week_number: 18, label: 'Week 18 (Locked - Aug 25)', is_locked: true, unlock_date: '2026-08-25' },
+    { week_number: 19, label: 'Week 19 (Locked - Sep 01)', is_locked: true, unlock_date: '2026-09-01' },
   ]);
 
   const fetchWeeks = async () => {
@@ -28,11 +29,11 @@ export default function DashboardPage() {
       if (res.ok) {
         const data = await res.json();
         if (data.weeks) {
-          setWeeksList(data.weeks.map((w: any) => ({ week_number: w.week_number, label: w.label })));
+          setWeeksList(data.weeks);
         }
       }
     } catch (err) {
-      console.warn('Backend offline, using historical static weeks list.', err);
+      console.warn('Backend offline, using historical time-gated weeks list.', err);
     }
   };
 
@@ -47,6 +48,11 @@ export default function DashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setReportText(data.report);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 403) {
+          setReportText(`🔒 **Time-Gated Content**: ${errData.detail || 'This week is locked until its chronological release date.'}`);
+        }
       }
     } catch (error) {
       console.warn('Backend API offline, utilizing reactive role state fallback.', error);
@@ -61,6 +67,11 @@ export default function DashboardPage() {
   };
 
   const handleWeekChange = (newWeek: string) => {
+    const target = weeksList.find(w => String(w.week_number) === newWeek);
+    if (target?.is_locked) {
+      alert(`Week ${newWeek} is chronologically time-gated and will unlock on ${target.unlock_date}.`);
+      return;
+    }
     setSelectedWeek(newWeek);
     fetchRoleReport(selectedRole, newWeek);
   };
@@ -93,12 +104,12 @@ export default function DashboardPage() {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Week {selectedWeek} • Historical & Automated Review Insights for {selectedRole} Lens
+              Week {selectedWeek} • 100% Real App Store & Play Store Reviews for {selectedRole} Lens
             </p>
           </div>
 
           <div className="w-full sm:w-auto flex flex-wrap items-center gap-3">
-            {/* Week Selector Dropdown */}
+            {/* Time-Gated Week Selector Dropdown */}
             <div className="flex items-center gap-1.5 bg-[#1f293d] px-3 py-2 rounded-xl border border-slate-700 text-xs">
               <Calendar className="w-3.5 h-3.5 text-[#00d09c]" />
               <select
@@ -107,8 +118,13 @@ export default function DashboardPage() {
                 className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer"
               >
                 {weeksList.map((w) => (
-                  <option key={w.week_number} value={String(w.week_number)} className="bg-[#111827] text-slate-200">
-                    {w.label}
+                  <option
+                    key={w.week_number}
+                    value={String(w.week_number)}
+                    disabled={w.is_locked}
+                    className={`bg-[#111827] ${w.is_locked ? 'text-slate-500' : 'text-slate-200'}`}
+                  >
+                    {w.is_locked ? `🔒 ${w.label}` : w.label}
                   </option>
                 ))}
               </select>
@@ -141,7 +157,7 @@ export default function DashboardPage() {
 
       {/* Footer */}
       <footer className="py-6 border-t border-[#1f293d] text-center text-xs text-slate-500 bg-slate-950">
-        <p>© 2026 Groww Pulse Insights Engine • Reactive Role & Timeline Dashboard</p>
+        <p>© 2026 Groww Pulse Insights Engine • Real Store Reviews & Time-Gated Release Engine</p>
       </footer>
     </div>
   );

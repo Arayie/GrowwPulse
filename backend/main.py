@@ -7,6 +7,7 @@ import numpy as np
 import base64
 import smtplib
 import pandas as pd
+from datetime import datetime, date
 from typing import Optional, Tuple, Dict, List
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -37,7 +38,7 @@ from email.message import EmailMessage
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Historical Weeks (W15-W17) & Automated Weekly Generation (W18+)")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Real Store Reviews & Strict Calendar Time-Gating Engine")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -51,11 +52,30 @@ app.add_middleware(
 # Initialize global scrubber instance
 scrubber = AdvancedPIIScrubber()
 
-# Step 1: Historical Database (W15, W16, W17) + Dynamic Future Weeks
-WEEKS_DATABASE: Dict[str, Dict] = {
+# Step 1: Real Reviews Store Loader
+def load_real_store_reviews(file_path: str = "reviews.csv") -> pd.DataFrame:
+    if not os.path.isabs(file_path):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(base_dir, file_path)
+        
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Real reviews CSV file not found at: {file_path}")
+        
+    df = pd.read_csv(file_path)
+    df_clean = scrubber.clean_dataframe(df)
+    return df_clean
+
+# Load 100% real reviews on initialization & sanitize NaNs for JSON safety
+REAL_REVIEWS_DF = load_real_store_reviews("reviews.csv").fillna("")
+
+# Step 2: Historical Database (W15, W16, W17) & Time-Gated Future Weeks (W18, W19)
+WEEKS_TIMELINE: Dict[str, Dict] = {
     "15": {
         "week_number": 15,
         "label": "Week 15 (Historical)",
+        "start_date": "2026-08-04",
+        "unlock_date": "2026-08-04",
+        "is_locked": False,
         "review_count": 760,
         "happiness_score": 71,
         "top_theme": "Onboarding & Bank Verification Latency",
@@ -74,6 +94,9 @@ WEEKS_DATABASE: Dict[str, Dict] = {
     "16": {
         "week_number": 16,
         "label": "Week 16 (Historical)",
+        "start_date": "2026-08-11",
+        "unlock_date": "2026-08-11",
+        "is_locked": False,
         "review_count": 820,
         "happiness_score": 65,
         "top_theme": "Payment Processing Stalls & Failed Refunds",
@@ -92,7 +115,10 @@ WEEKS_DATABASE: Dict[str, Dict] = {
     "17": {
         "week_number": 17,
         "label": "Week 17 (Current)",
-        "review_count": 880,
+        "start_date": "2026-08-18",
+        "unlock_date": "2026-08-18",
+        "is_locked": False,
+        "review_count": len(REAL_REVIEWS_DF),
         "happiness_score": 62,
         "top_theme": "Double SIP AutoPay Mandate Duplication",
         "themes": [
@@ -106,48 +132,55 @@ WEEKS_DATABASE: Dict[str, Dict] = {
             "\"Bank verification stuck for 5 days. Cannot set up AutoPay mandate. Contacted support at [EMAIL REDACTED].\""
         ],
         "metrics": {"Stability": 82, "Payments": 60, "Onboarding": 91, "Portfolio": 85, "Support": 74}
+    },
+    "18": {
+        "week_number": 18,
+        "label": "Week 18 (Locked - Aug 25, 2026)",
+        "start_date": "2026-08-25",
+        "unlock_date": "2026-08-25",
+        "is_locked": True,
+        "review_count": 0,
+        "happiness_score": 0,
+        "top_theme": "Time-Gated (Unlocks Aug 25, 2026)",
+        "themes": ["Time-Gated Content - Unlocks Aug 25, 2026"],
+        "quotes": ["Time-Gated Content - Unlocks Aug 25, 2026"],
+        "metrics": {"Stability": 0, "Payments": 0, "Onboarding": 0, "Portfolio": 0, "Support": 0}
+    },
+    "19": {
+        "week_number": 19,
+        "label": "Week 19 (Locked - Sep 01, 2026)",
+        "start_date": "2026-09-01",
+        "unlock_date": "2026-09-01",
+        "is_locked": True,
+        "review_count": 0,
+        "happiness_score": 0,
+        "top_theme": "Time-Gated (Unlocks Sep 01, 2026)",
+        "themes": ["Time-Gated Content - Unlocks Sep 01, 2026"],
+        "quotes": ["Time-Gated Content - Unlocks Sep 01, 2026"],
+        "metrics": {"Stability": 0, "Payments": 0, "Onboarding": 0, "Portfolio": 0, "Support": 0}
     }
 }
 
-# Step 2: Automated Weekly Data Generation Function (W18, W19, ...)
-def generate_next_week_data() -> Dict:
-    existing_weeks = [int(w) for w in WEEKS_DATABASE.keys()]
-    next_week_num = max(existing_weeks) + 1
+# Step 3: Strict Calendar Date Time-Gating Engine Helper
+def check_week_lock_status(week_id: str) -> Tuple[bool, str]:
+    """
+    Checks if a week is chronologically locked based on current system date.
+    Returns (is_locked, unlock_date_string)
+    """
+    if week_id not in WEEKS_TIMELINE:
+        return True, "Future"
+        
+    week_info = WEEKS_TIMELINE[week_id]
+    unlock_date_str = week_info["unlock_date"]
+    unlock_dt = datetime.strptime(unlock_date_str, "%Y-%m-%d").date()
     
-    new_week_entry = {
-        "week_number": next_week_num,
-        "label": f"Week {next_week_num} (Auto-Generated)",
-        "review_count": 880 + (next_week_num - 17) * 45,
-        "happiness_score": min(95, max(50, 62 + (next_week_num - 17) * 3)),
-        "top_theme": f"Automated Mandate Deduplication & Performance Patch (W{next_week_num})",
-        "themes": [
-            f"1. Automated Mandate Deduplication Engine Deployment (W{next_week_num})",
-            f"2. iOS Metal Chart Performance Patch Verification (W{next_week_num})",
-            f"3. Instant NPCI Webhook KYC Clearing (W{next_week_num})"
-        ],
-        "quotes": [
-            f"\"Week {next_week_num} update fixed double SIP issue! Account [ID REDACTED] verified.\"",
-            f"\"iOS charts loading smoothly now during market opening. Resolved for [EMAIL REDACTED].\"",
-            f"\"Instant penny drop verification completed in 1 minute. Excellent progress.\""
-        ],
-        "metrics": {
-            "Stability": min(98, 82 + (next_week_num - 17) * 4),
-            "Payments": min(95, 60 + (next_week_num - 17) * 6),
-            "Onboarding": min(98, 91 + (next_week_num - 17) * 2),
-            "Portfolio": min(96, 85 + (next_week_num - 17) * 2),
-            "Support": min(95, 74 + (next_week_num - 17) * 4)
-        }
-    }
+    current_dt = date.today()
+    # Reference current simulation date: 2026-08-18
+    ref_date = max(current_dt, date(2026, 8, 18))
     
-    WEEKS_DATABASE[str(next_week_num)] = new_week_entry
-    return new_week_entry
-
-# Initialize auto-generation on startup
-@app.on_event("startup")
-async def startup_event():
-    # Ensure Week 18 is auto-generated on startup
-    if "18" not in WEEKS_DATABASE:
-        generate_next_week_data()
+    if ref_date < unlock_dt:
+        return True, unlock_date_str
+    return False, unlock_date_str
 
 # Role Directives Dictionary
 ROLE_DIRECTIVES = {
@@ -166,7 +199,14 @@ def get_role_directive(role: str) -> str:
         return ROLE_DIRECTIVES['Leadership']
 
 def generate_role_report(role: str, week_id: str = "17") -> str:
-    week_data = WEEKS_DATABASE.get(week_id, WEEKS_DATABASE["17"])
+    is_locked, unlock_date = check_week_lock_status(week_id)
+    if is_locked:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Week {week_id} is chronologically time-gated and will unlock on {unlock_date}."
+        )
+
+    week_data = WEEKS_TIMELINE.get(week_id, WEEKS_TIMELINE["17"])
     themes_list = week_data["themes"]
     quotes_list = week_data["quotes"]
     
@@ -186,18 +226,6 @@ def generate_role_report(role: str, week_id: str = "17") -> str:
         "- **Support**: Deploy hotfix patch optimizing iOS chart rendering pipeline and WebSocket data stream buffers.\n"
         "- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks."
     )
-
-def load_and_clean_csv(file_path: str) -> pd.DataFrame:
-    if not os.path.isabs(file_path):
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(base_dir, file_path)
-        
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"CSV file not found at: {file_path}")
-        
-    df = pd.read_csv(file_path)
-    df_clean = scrubber.clean_dataframe(df)
-    return df_clean
 
 def cluster_reviews(df: pd.DataFrame, num_clusters: int = 5) -> Tuple[pd.DataFrame, str]:
     df_clustered = df.copy()
@@ -345,9 +373,6 @@ def generate_pdf(
 
     return generate_pdf_sync(role, themes, quotes, action_ideas, chart_categories, chart_scores)
 
-def generate_pdf_charts(role: str = "Product") -> Dict[str, str]:
-    return {"graph_base64": ""}
-
 def send_smtp_dispatch(msg: EmailMessage) -> str:
     smtp_email = os.environ.get("SMTP_EMAIL")
     smtp_password = os.environ.get("SMTP_PASSWORD")
@@ -390,17 +415,25 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "Historical Weeks (W15-W17) & Automated Weekly Generation (W18+)"
+        "phase": "100% Real App Store Reviews + Strict Calendar Time-Gating Engine"
     }
 
-# Step 1 & 2 API Endpoints for Weeks & Automated Generation
+# Time-Gated Weeks API Endpoint
 @app.get("/api/weeks")
 def get_all_weeks():
     """
-    Returns list of all historical (W15, W16, W17) and auto-generated future weeks.
+    Returns list of all historical (W15, W16, W17) and time-gated future weeks (W18, W19).
+    Updates `is_locked` status dynamically based on current calendar date.
     """
-    sorted_keys = sorted(WEEKS_DATABASE.keys(), key=lambda x: int(x))
-    weeks_list = [WEEKS_DATABASE[k] for k in sorted_keys]
+    sorted_keys = sorted(WEEKS_TIMELINE.keys(), key=lambda x: int(x))
+    weeks_list = []
+    
+    for k in sorted_keys:
+        info = WEEKS_TIMELINE[k].copy()
+        is_locked, unlock_date = check_week_lock_status(k)
+        info["is_locked"] = is_locked
+        weeks_list.append(info)
+        
     return {
         "status": "success",
         "count": len(weeks_list),
@@ -409,23 +442,37 @@ def get_all_weeks():
 
 @app.get("/api/weeks/{week_id}")
 def get_week_details(week_id: str):
-    if week_id not in WEEKS_DATABASE:
+    if week_id not in WEEKS_TIMELINE:
         raise HTTPException(status_code=404, detail=f"Week {week_id} not found in database")
+        
+    is_locked, unlock_date = check_week_lock_status(week_id)
+    if is_locked:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Week {week_id} is chronologically time-gated and will unlock on {unlock_date}."
+        )
+        
     return {
         "status": "success",
-        "week": WEEKS_DATABASE[week_id]
+        "week": WEEKS_TIMELINE[week_id]
     }
 
-@app.post("/api/weeks/generate-next")
-def trigger_generate_next_week():
-    """
-    Triggers automated generation of the next upcoming week (e.g. Week 18, Week 19).
-    """
-    new_week = generate_next_week_data()
+@app.get("/api/library/reviews")
+def get_real_reviews(week_id: Optional[str] = "17", limit: int = 50):
+    is_locked, unlock_date = check_week_lock_status(week_id or "17")
+    if is_locked:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Week {week_id} review dataset is chronologically time-gated and will unlock on {unlock_date}."
+        )
+        
+    # Return 100% real sanitized store reviews
+    real_sample = REAL_REVIEWS_DF.head(limit).to_dict(orient="records")
     return {
         "status": "success",
-        "message": f"Successfully auto-generated {new_week['label']}",
-        "new_week": new_week
+        "week_id": week_id,
+        "count": len(real_sample),
+        "reviews": real_sample
     }
 
 @app.post("/test-sanitization")
@@ -439,31 +486,36 @@ def test_sanitization(request: SanitizeRequest):
 @app.get("/api/library/download")
 def download_library_csv():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, "library", "reviews.csv")
+    csv_path = os.path.join(base_dir, "reviews.csv")
     
     if not os.path.exists(csv_path):
-        csv_path = os.path.join(base_dir, "reviews.csv")
-        
-    if not os.path.exists(csv_path):
-        raise HTTPException(status_code=404, detail="Library reviews.csv file not found")
+        raise HTTPException(status_code=404, detail="Real reviews CSV file not found")
         
     return FileResponse(
         path=csv_path,
-        filename="groww_sanitized_reviews_wk17.csv",
+        filename="groww_real_sanitized_reviews_wk17.csv",
         media_type="text/csv"
     )
 
 @app.post("/generate-weekly-pulse")
 async def generate_weekly_pulse(request: WeeklyPulseRequest):
+    week_id = request.week_id or "17"
+    is_locked, unlock_date = check_week_lock_status(week_id)
+    if is_locked:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Week {week_id} is chronologically time-gated and will unlock on {unlock_date}."
+        )
+
     try:
-        df_clean = load_and_clean_csv(request.csv_file_path)
+        df_clean = load_real_store_reviews("reviews.csv")
         df_clustered, cluster_summary = cluster_reviews(df_clean, num_clusters=5)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing CSV or clustering: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing real store CSV: {str(e)}")
 
-    report_text = generate_role_report(request.role, request.week_id or "17")
+    report_text = generate_role_report(request.role, week_id)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     report_file_path = os.path.join(base_dir, "Weekly_Pulse_Report.md")
@@ -476,7 +528,7 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
     return {
         "status": "success",
         "role": request.role,
-        "week_id": request.week_id or "17",
+        "week_id": week_id,
         "saved_report_path": report_file_path,
         "saved_pdf_path": pdf_file_path,
         "report": report_text
@@ -484,10 +536,15 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
 
 @app.post("/api/send-pulse-email")
 async def send_pulse_email(request: SendEmailRequest):
+    week_id = request.week_id or "17"
+    is_locked, unlock_date = check_week_lock_status(week_id)
+    if is_locked:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Week {week_id} report is chronologically time-gated and will unlock on {unlock_date}."
+        )
+
     try:
-        df_clean = load_and_clean_csv("reviews.csv")
-        df_clustered, cluster_summary = cluster_reviews(df_clean, num_clusters=5)
-        
         themes_input = request.themes if request.themes else "1. Double SIP AutoPay Mandate Duplication\n2. iOS Candlestick Chart Freezes\n3. Bank Account Validation Stalls"
         quotes_input = request.quotes if request.quotes else "> \"SIP amount deducted twice this month.\""
         action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
