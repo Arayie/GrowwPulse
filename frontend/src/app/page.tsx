@@ -25,7 +25,8 @@ export default function DashboardPage() {
 
   const fetchWeeks = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/weeks');
+      const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      const res = await fetch(`${BACKEND_URL}/api/weeks`);
       if (res.ok) {
         const data = await res.json();
         if (data.weeks) {
@@ -40,7 +41,8 @@ export default function DashboardPage() {
   const fetchRoleReport = async (roleName: RoleType, weekId: string = selectedWeek) => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/generate-weekly-pulse', {
+      const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      const res = await fetch(`${BACKEND_URL}/generate-weekly-pulse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: roleName, csv_file_path: 'reviews.csv', week_id: weekId }),

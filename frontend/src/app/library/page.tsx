@@ -67,7 +67,8 @@ export default function DataLibraryPage() {
 
   const fetchWeeks = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/weeks');
+      const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      const res = await fetch(`${BACKEND_URL}/api/weeks`);
       if (res.ok) {
         const data = await res.json();
         if (data.weeks && data.weeks.length > 0) {
@@ -104,7 +105,8 @@ export default function DataLibraryPage() {
   const handleDownloadCSV = async () => {
     setIsDownloading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/library/download');
+      const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      const response = await fetch(`${BACKEND_URL}/api/library/download`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
