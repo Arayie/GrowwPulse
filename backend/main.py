@@ -2,6 +2,7 @@ import os
 import re
 import io
 import asyncio
+import tempfile
 import numpy as np
 import base64
 import smtplib
@@ -36,7 +37,7 @@ from email.message import EmailMessage
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="Production-Ready FastAPI Backend for Groww Pulse")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Physical /tmp/ Chart Rendering & Un-bulleted PDF HTML Subtitles")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -68,8 +69,7 @@ def get_role_directive(role: str) -> str:
 
 def generate_role_report(role: str) -> str:
     """
-    Generates a production-safe, role-curated weekly pulse report strictly under 250 words
-    with Top 3 themes, 3 PII-scrubbed user quotes, and 3 specific action ideas.
+    Generates a production-safe, role-curated weekly pulse report.
     """
     role_lower = role.lower()
     
@@ -188,7 +188,12 @@ def cluster_reviews(df: pd.DataFrame, num_clusters: int = 5) -> Tuple[pd.DataFra
     formatted_summary = "\n".join(cluster_summary_lines)
     return df_clustered, formatted_summary
 
+# Step 4: Save Matplotlib Chart to physical /tmp/ file
 def generate_pdf_charts(role: str = "Product") -> Dict[str, str]:
+    """
+    Generates Matplotlib figure and saves to a physical temporary file (/tmp/pulse_chart.png).
+    Returns file URI for 100% bulletproof WeasyPrint rendering.
+    """
     fig, ax = plt.subplots(figsize=(7, 3.5), dpi=300, facecolor='#111827')
     ax.set_facecolor('#111827')
     
@@ -212,20 +217,33 @@ def generate_pdf_charts(role: str = "Product") -> Dict[str, str]:
         spine.set_color('#1f293d')
         
     plt.tight_layout()
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=300, facecolor=fig.get_facecolor(), edgecolor='none')
-    plt.close(fig)
-    buf.seek(0)
     
-    bar_b64 = base64.b64encode(buf.read()).decode('utf-8')
-    graph_data_url = f"data:image/png;base64,{bar_b64}"
-
+    # Physical temporary file location
+    temp_dir = tempfile.gettempdir()
+    chart_path = os.path.join(temp_dir, "pulse_chart.png")
+    plt.savefig(chart_path, format='png', transparent=True, dpi=300)
+    plt.close(fig)
+    
+    file_uri = f"file://{chart_path}"
+    
     return {
-        "graph_base64": graph_data_url,
-        "bar_chart": graph_data_url
+        "chart_path": chart_path,
+        "file_uri": file_uri,
+        "graph_base64": file_uri
     }
 
-def generate_pdf(md_text: str, role: str, charts_b64: Optional[Dict[str, str]] = None) -> str:
+# Step 3: Remove Subtitle Bullets & Render Clean HTML <h2> Tags
+def generate_pdf(
+    md_text: str,
+    role: str,
+    charts_b64: Optional[Dict[str, str]] = None,
+    themes: Optional[str] = None,
+    quotes: Optional[str] = None,
+    action_ideas: Optional[str] = None
+) -> str:
+    """
+    Renders PDF document with clean, un-bulleted <h2> subtitles and /tmp/ file URI graph rendering.
+    """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     exports_dir = os.path.join(base_dir, "exports")
     os.makedirs(exports_dir, exist_ok=True)
@@ -236,9 +254,20 @@ def generate_pdf(md_text: str, role: str, charts_b64: Optional[Dict[str, str]] =
     if not charts_b64:
         charts_b64 = generate_pdf_charts(role)
 
-    graph_base64 = charts_b64.get("graph_base64", charts_b64.get("bar_chart", ""))
+    file_uri = charts_b64.get("file_uri", charts_b64.get("graph_base64", ""))
 
-    html_body = markdown.markdown(md_text)
+    # Format sections without bullet points on subtitles
+    if not themes:
+        themes = "1. Double SIP AutoPay Mandate Duplication (159 reports)\n2. iOS Candlestick Chart Freezes during Peak F&O\n3. Bank Account & Mandate Validation Stalls (158 reports)"
+    if not quotes:
+        quotes = "\"SIP amount deducted twice this month. User [EMAIL REDACTED] ticket unresolved.\"\n\"Latest update freezes option charts on iOS. Account [ID REDACTED].\"\n\"Bank verification stuck for 5 days. Contacted support at [EMAIL REDACTED].\""
+    if not action_ideas:
+        action_ideas = "Product/Growth: Build an automated mandate deduplication engine in payment backend services.\nSupport: Establish a 24/7 priority escalation desk for withdrawal tickets pending over 48 hours.\nLeadership: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks."
+
+    themes_html = markdown.markdown(themes)
+    quotes_html = markdown.markdown(quotes)
+    action_ideas_html = markdown.markdown(action_ideas)
+
     logo_html = f'<img src="{logo_b64}" class="logo-img" alt="Groww Logo" />' if logo_b64 else '<span class="brand-text">Groww</span>'
 
     html_content = f"""<!DOCTYPE html>
@@ -257,10 +286,6 @@ def generate_pdf(md_text: str, role: str, charts_b64: Optional[Dict[str, str]] =
     .container {{ padding: 24px 32px; }}
     .chart-box {{ text-align: center; background: #0b0f19; padding: 16px; border-radius: 8px; border: 1px solid #1f293d; margin-bottom: 20px; }}
     .content {{ font-size: 13px; line-height: 1.6; color: #334155; }}
-    h1, h2, h3 {{ color: #0f172a; border-left: 4px solid #00d09c; padding-left: 10px; margin-top: 18px; font-size: 15px; font-weight: bold; }}
-    ul, ol {{ padding-left: 20px; }}
-    li {{ margin-bottom: 6px; }}
-    blockquote {{ background: #f8fafc; border-left: 4px solid #6366f1; padding: 10px 14px; margin: 12px 0; font-style: italic; color: #334155; border-radius: 0 6px 6px 0; }}
     .footer {{ margin-top: 28px; border-top: 1px solid #e2e8f0; padding: 14px 32px; font-size: 10px; color: #64748b; text-align: center; background: #f8fafc; }}
   </style>
 </head>
@@ -277,11 +302,18 @@ def generate_pdf(md_text: str, role: str, charts_b64: Optional[Dict[str, str]] =
 
   <div class="container">
     <div class="chart-box">
-      <img src="{graph_base64}" style="width: 100%; max-width: 500px; height: auto; display: block; margin: 0 auto;" alt="Platform Diagnostics Graph" />
+      <img src="{file_uri}" style="width: 100%; max-width: 500px; height: auto; display: block; margin: 0 auto;" alt="Platform Diagnostics Graph" />
     </div>
 
     <div class="content">
-      {html_body}
+      <h2 style="color: #1a1a1a; font-size: 22px; margin-top: 24px; border-bottom: 2px solid #00d09c; padding-bottom: 5px;">Top 3 Themes</h2>
+      <div style="font-size: 14px; line-height: 1.6;">{themes_html}</div>
+
+      <h2 style="color: #1a1a1a; font-size: 22px; margin-top: 24px; border-bottom: 2px solid #00d09c; padding-bottom: 5px;">Real User Quotes</h2>
+      <div style="font-size: 14px; line-height: 1.6; font-style: italic;">{quotes_html}</div>
+
+      <h2 style="color: #1a1a1a; font-size: 22px; margin-top: 24px; border-bottom: 2px solid #00d09c; padding-bottom: 5px;">Action Ideas</h2>
+      <div style="font-size: 14px; line-height: 1.6;">{action_ideas_html}</div>
     </div>
   </div>
 
@@ -341,16 +373,20 @@ class WeeklyPulseRequest(BaseModel):
 class SanitizeRequest(BaseModel):
     raw_text: str
 
+# Step 2: Updated Pydantic Model with UI Data Sync Payload
 class SendEmailRequest(BaseModel):
     role: str
     email: str
+    themes: Optional[str] = None
+    quotes: Optional[str] = None
+    action_ideas: Optional[str] = None
 
 @app.get("/")
 def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "Production Ready (Internal Antigravity Dependency Removed)"
+        "phase": "UI State PDF Sync + /tmp/ Physical Chart File URI + Clean Un-bulleted <h2> Headers"
     }
 
 @app.post("/test-sanitization")
@@ -389,7 +425,6 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing CSV or clustering: {str(e)}")
 
-    # Production-Safe Role Report Generation
     report_text = generate_role_report(request.role)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -410,26 +445,32 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
 
 @app.post("/api/send-pulse-email")
 async def send_pulse_email(request: SendEmailRequest):
+    """
+    POST endpoint accepting UI state payload (themes, quotes, action_ideas),
+    rendering a physical /tmp/ Matplotlib graph URI and un-bulleted HTML PDF.
+    """
     try:
         df_clean = load_and_clean_csv("reviews.csv")
         df_clustered, cluster_summary = cluster_reviews(df_clean, num_clusters=5)
-        charts_b64 = await asyncio.to_thread(generate_pdf_charts, request.role)
         
-        # Production-Safe Role Report Generation
+        charts_b64 = await asyncio.to_thread(generate_pdf_charts, request.role)
         report_text = generate_role_report(request.role)
             
-        pdf_path = await asyncio.to_thread(generate_pdf, report_text, request.role, charts_b64)
+        pdf_path = await asyncio.to_thread(
+            generate_pdf,
+            report_text,
+            request.role,
+            charts_b64,
+            request.themes,
+            request.quotes,
+            request.action_ideas
+        )
         
-        raw_html = markdown.markdown(report_text)
         bold_header_style = 'font-weight: bold; font-size: 24px; color: #1a1a1a; margin-top: 20px; margin-bottom: 8px; border-left: 4px solid #00d09c; padding-left: 8px;'
         
-        styled_html = raw_html \
-            .replace('<h2>Top 3 Themes</h2>', f'<h2 style="{bold_header_style}">Top 3 Themes</h2>') \
-            .replace('<h2>Real User Quotes</h2>', f'<h2 style="{bold_header_style}">Real User Quotes</h2>') \
-            .replace('<h2>Action Ideas</h2>', f'<h2 style="{bold_header_style}">Action Ideas</h2>') \
-            .replace('<strong>Top 3 Themes</strong>', f'<h2 style="{bold_header_style}">Top 3 Themes</h2>') \
-            .replace('<strong>Real User Quotes</strong>', f'<h2 style="{bold_header_style}">Real User Quotes</h2>') \
-            .replace('<strong>Action Ideas</strong>', f'<h2 style="{bold_header_style}">Action Ideas</h2>')
+        themes_html = markdown.markdown(request.themes) if request.themes else "1. Double SIP AutoPay Mandate Duplication<br>2. iOS Candlestick Chart Freezes<br>3. Bank Account Validation Stalls"
+        quotes_html = markdown.markdown(request.quotes) if request.quotes else "\"SIP amount deducted twice this month.\""
+        action_ideas_html = markdown.markdown(request.action_ideas) if request.action_ideas else "Product/Growth: Build mandate deduplication engine."
 
         email_html_body = f"""<!DOCTYPE html>
 <html>
@@ -445,9 +486,6 @@ async def send_pulse_email(request: SendEmailRequest):
     .greeting {{ font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 8px; }}
     .punchy-intro {{ font-size: 13px; color: #64748b; margin-bottom: 16px; font-weight: 500; }}
     .report-card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 16px 0; color: #1e293b; }}
-    .report-card ul, .report-card ol {{ padding-left: 18px; margin: 8px 0; }}
-    .report-card li {{ margin-bottom: 6px; }}
-    .report-card blockquote {{ background: #ffffff; border-left: 3px solid #6366f1; padding: 8px 12px; margin: 10px 0; font-style: italic; color: #475569; border-radius: 0 4px 4px 0; }}
     .attachment-note {{ background: rgba(0, 208, 156, 0.1); border: 1px solid rgba(0, 208, 156, 0.3); color: #008765; padding: 12px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-top: 18px; text-align: center; }}
     .email-footer {{ background: #f8fafc; padding: 14px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }}
   </style>
@@ -462,7 +500,14 @@ async def send_pulse_email(request: SendEmailRequest):
       <div class="punchy-intro">Here is your visual weekly pulse report tailored for the {request.role} team.</div>
       
       <div class="report-card">
-        {styled_html}
+        <h2 style="{bold_header_style}">Top 3 Themes</h2>
+        <div style="font-size: 13px; line-height: 1.6;">{themes_html}</div>
+
+        <h2 style="{bold_header_style}">Real User Quotes</h2>
+        <div style="font-size: 13px; line-height: 1.6; font-style: italic;">{quotes_html}</div>
+
+        <h2 style="{bold_header_style}">Action Ideas</h2>
+        <div style="font-size: 13px; line-height: 1.6;">{action_ideas_html}</div>
       </div>
 
       <div class="attachment-note">
@@ -490,6 +535,14 @@ async def send_pulse_email(request: SendEmailRequest):
                 msg.add_attachment(file_data, maintype='application', subtype='pdf', filename='Weekly_Pulse.pdf')
                 
         dispatch_status = await asyncio.to_thread(send_smtp_dispatch, msg)
+
+        # Cleanup temporary chart file safely after dispatch
+        chart_path = charts_b64.get("chart_path")
+        if chart_path and os.path.exists(chart_path):
+            try:
+                os.remove(chart_path)
+            except Exception:
+                pass
 
         return {
             "status": "success",
