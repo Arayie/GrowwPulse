@@ -3,6 +3,7 @@ import re
 import io
 import asyncio
 import tempfile
+import traceback
 import numpy as np
 import base64
 import smtplib
@@ -38,7 +39,7 @@ from email.message import EmailMessage
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Non-Blocking FastAPI BackgroundTasks Email Pipeline & SMTP Timeouts")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Robust Traceback Error Trapping & Granular Step Logging")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -399,7 +400,6 @@ def generate_pdf(
 
     return generate_pdf_sync(role, themes, quotes, action_ideas, chart_categories, chart_scores)
 
-# Step 2: Explicit Timeouts (15s) & Verbose Logging for SMTP
 def send_smtp_dispatch(msg: EmailMessage) -> str:
     smtp_email = os.environ.get("SMTP_EMAIL")
     smtp_password = os.environ.get("SMTP_PASSWORD")
@@ -421,7 +421,7 @@ def send_smtp_dispatch(msg: EmailMessage) -> str:
         print("[SMTP ENGINE] SMTP credentials not set in .env. Drafted email & PDF ready.")
         return "Branded HTML Email drafted & PDF generated successfully! (Add SMTP_EMAIL and SMTP_PASSWORD to .env for live sending)"
 
-# Step 1: Background Worker Function for FastAPI BackgroundTasks
+# Robust Background Worker Function with Granular Logging & Traceback Error Trapping
 def process_email_in_background(
     role: str,
     email: str,
@@ -431,8 +431,8 @@ def process_email_in_background(
     chart_categories: Optional[List[str]] = None,
     chart_scores: Optional[List[int]] = None
 ):
-    print(f"[BACKGROUND TASK START] Starting PDF generation for role: '{role}'...")
     try:
+        print(">>> Step 1: Starting PDF generation...")
         pdf_path = generate_pdf_sync(
             role,
             themes,
@@ -441,7 +441,7 @@ def process_email_in_background(
             chart_categories,
             chart_scores
         )
-        print(f"[BACKGROUND TASK SUCCESS] PDF generated successfully at path: {pdf_path}")
+        print(f">>> Step 2: PDF generated at {pdf_path}. Connecting to SMTP...")
         
         themes_bulleted = format_as_bullets(themes)
         quotes_bulleted = format_as_bullets(quotes)
@@ -517,11 +517,11 @@ def process_email_in_background(
                 file_data = f.read()
                 msg.add_attachment(file_data, maintype='application', subtype='pdf', filename='Weekly_Pulse.pdf')
                 
-        print(f"[BACKGROUND TASK] Initiating SMTP dispatch for target: {email}...")
         dispatch_status = send_smtp_dispatch(msg)
-        print(f"[BACKGROUND TASK FINISHED] Dispatch status result: '{dispatch_status}'")
-    except Exception as bg_err:
-        print(f"[BACKGROUND TASK ERROR] Exception raised during background execution: {str(bg_err)}")
+        print(">>> Step 3: SUCCESS! Email sent.")
+    except Exception as e:
+        print(f"CRITICAL BACKGROUND TASK FAILURE: {str(e)}")
+        print(traceback.format_exc())
 
 class WeeklyPulseRequest(BaseModel):
     role: Optional[str] = "Lead Insights Analyst"
@@ -548,7 +548,7 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "FastAPI BackgroundTasks Email Pipeline + 15s SMTP Timeouts"
+        "phase": "Robust Background Error Trapping & Granular Step Logging"
     }
 
 @app.get("/api/weeks")
@@ -661,7 +661,6 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
         "report": report_text
     }
 
-# Step 1: Non-Blocking BackgroundTasks Endpoint
 @app.post("/api/send-pulse-email")
 async def send_pulse_email(request: SendEmailRequest, background_tasks: BackgroundTasks):
     week_id = request.week_id or "17"
