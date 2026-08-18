@@ -38,7 +38,7 @@ from email.message import EmailMessage
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Real Store Reviews & Strict Calendar Time-Gating Engine")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Redesigned PDF Template & Strict Markdown Bullet Formatting")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -68,7 +68,7 @@ def load_real_store_reviews(file_path: str = "reviews.csv") -> pd.DataFrame:
 # Load 100% real reviews on initialization & sanitize NaNs for JSON safety
 REAL_REVIEWS_DF = load_real_store_reviews("reviews.csv").fillna("")
 
-# Step 2: Historical Database (W15, W16, W17) & Time-Gated Future Weeks (W18, W19)
+# Historical Database (W15, W16, W17) & Time-Gated Future Weeks (W18, W19)
 WEEKS_TIMELINE: Dict[str, Dict] = {
     "15": {
         "week_number": 15,
@@ -80,14 +80,14 @@ WEEKS_TIMELINE: Dict[str, Dict] = {
         "happiness_score": 71,
         "top_theme": "Onboarding & Bank Verification Latency",
         "themes": [
-            "1. Bank Verification Pending > 3 Days (140 reports)",
-            "2. UPI AutoPay Mandate Creation Failures (125 reports)",
-            "3. Portfolio Valuation Lag during Market Hours (110 reports)"
+            "Bank Verification Pending > 3 Days (140 reports)",
+            "UPI AutoPay Mandate Creation Failures (125 reports)",
+            "Portfolio Valuation Lag during Market Hours (110 reports)"
         ],
         "quotes": [
-            "\"KYC verification stuck for 3 days. Account [ID REDACTED] unable to trade.\"",
-            "\"AutoPay mandate failed twice on HDFC bank. Contacted support [EMAIL REDACTED].\"",
-            "\"Portfolio value updating 15 mins late. Fix this bug immediately.\""
+            "KYC verification stuck for 3 days. Account [ID REDACTED] unable to trade.",
+            "AutoPay mandate failed twice on HDFC bank. Contacted support [EMAIL REDACTED].",
+            "Portfolio value updating 15 mins late. Fix this bug immediately."
         ],
         "metrics": {"Stability": 85, "Payments": 68, "Onboarding": 60, "Portfolio": 78, "Support": 72}
     },
@@ -101,14 +101,14 @@ WEEKS_TIMELINE: Dict[str, Dict] = {
         "happiness_score": 65,
         "top_theme": "Payment Processing Stalls & Failed Refunds",
         "themes": [
-            "1. Failed UPI Transactions Stalled for 72 Hours (150 reports)",
-            "2. Double SIP Debits on Mandate Execution (145 reports)",
-            "3. App Crash on Order Placement (120 reports)"
+            "Failed UPI Transactions Stalled for 72 Hours (150 reports)",
+            "Double SIP Debits on Mandate Execution (145 reports)",
+            "App Crash on Order Placement (120 reports)"
         ],
         "quotes": [
-            "\"Money deducted but order failed. Refund pending since 48h. User [EMAIL REDACTED].\"",
-            "\"SIP executed twice on 5th of month. Ticket [ID REDACTED] unresolved.\"",
-            "\"App closes abruptly when placing F&O order. Please resolve.\""
+            "Money deducted but order failed. Refund pending since 48h. User [EMAIL REDACTED].",
+            "SIP executed twice on 5th of month. Ticket [ID REDACTED] unresolved.",
+            "App closes abruptly when placing F&O order. Please resolve."
         ],
         "metrics": {"Stability": 80, "Payments": 58, "Onboarding": 75, "Portfolio": 82, "Support": 66}
     },
@@ -122,14 +122,14 @@ WEEKS_TIMELINE: Dict[str, Dict] = {
         "happiness_score": 62,
         "top_theme": "Double SIP AutoPay Mandate Duplication",
         "themes": [
-            "1. Double SIP AutoPay Mandate Duplication (159 reports)",
-            "2. iOS Candlestick Chart Freezes during Peak F&O (141 reports)",
-            "3. Bank Account & Mandate Validation Stalls (158 reports)"
+            "Double SIP AutoPay Mandate Duplication (159 reports)",
+            "iOS Candlestick Chart Freezes during Peak F&O (141 reports)",
+            "Bank Account & Mandate Validation Stalls (158 reports)"
         ],
         "quotes": [
-            "\"SIP amount deducted twice this month. Double deduction happened without reason. User [EMAIL REDACTED] ticket unresolved.\"",
-            "\"Latest update freezes option charts on iOS. Screen goes blank during fast market moves for account [ID REDACTED].\"",
-            "\"Bank verification stuck for 5 days. Cannot set up AutoPay mandate. Contacted support at [EMAIL REDACTED].\""
+            "SIP amount deducted twice this month. Double deduction happened without reason. User [EMAIL REDACTED] ticket unresolved.",
+            "Latest update freezes option charts on iOS. Screen goes blank during fast market moves for account [ID REDACTED].",
+            "Bank verification stuck for 5 days. Cannot set up AutoPay mandate. Contacted support at [EMAIL REDACTED]."
         ],
         "metrics": {"Stability": 82, "Payments": 60, "Onboarding": 91, "Portfolio": 85, "Support": 74}
     },
@@ -161,12 +161,7 @@ WEEKS_TIMELINE: Dict[str, Dict] = {
     }
 }
 
-# Step 3: Strict Calendar Date Time-Gating Engine Helper
 def check_week_lock_status(week_id: str) -> Tuple[bool, str]:
-    """
-    Checks if a week is chronologically locked based on current system date.
-    Returns (is_locked, unlock_date_string)
-    """
     if week_id not in WEEKS_TIMELINE:
         return True, "Future"
         
@@ -175,7 +170,6 @@ def check_week_lock_status(week_id: str) -> Tuple[bool, str]:
     unlock_dt = datetime.strptime(unlock_date_str, "%Y-%m-%d").date()
     
     current_dt = date.today()
-    # Reference current simulation date: 2026-08-18
     ref_date = max(current_dt, date(2026, 8, 18))
     
     if ref_date < unlock_dt:
@@ -198,6 +192,7 @@ def get_role_directive(role: str) -> str:
     else:
         return ROLE_DIRECTIVES['Leadership']
 
+# Step 1: Enforce Strict Bullet Point Formatting in Data Generation
 def generate_role_report(role: str, week_id: str = "17") -> str:
     is_locked, unlock_date = check_week_lock_status(week_id)
     if is_locked:
@@ -211,17 +206,14 @@ def generate_role_report(role: str, week_id: str = "17") -> str:
     quotes_list = week_data["quotes"]
     
     return (
-        f"## Top 3 Themes ({week_data['label']})\n"
-        f"1. **{themes_list[0]}**\n"
-        f"2. **{themes_list[1]}**\n"
-        f"3. **{themes_list[2]}**\n\n"
+        f"- **{themes_list[0]}**\n"
+        f"- **{themes_list[1]}**\n"
+        f"- **{themes_list[2]}**\n\n"
         "---\n"
-        "## Real User Quotes\n"
-        f"> {quotes_list[0]}\n"
-        f"> {quotes_list[1]}\n"
-        f"> {quotes_list[2]}\n\n"
+        f"- \"{quotes_list[0]}\"\n"
+        f"- \"{quotes_list[1]}\"\n"
+        f"- \"{quotes_list[2]}\"\n\n"
         "---\n"
-        "## Action Ideas\n"
         "- **Product/Growth**: Build an automated mandate deduplication engine in payment backend services to block double debits.\n"
         "- **Support**: Deploy hotfix patch optimizing iOS chart rendering pipeline and WebSocket data stream buffers.\n"
         "- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks."
@@ -270,6 +262,24 @@ def cluster_reviews(df: pd.DataFrame, num_clusters: int = 5) -> Tuple[pd.DataFra
     formatted_summary = "\n".join(cluster_summary_lines)
     return df_clustered, formatted_summary
 
+# Helper to format any incoming markdown text strictly into bullet items
+def format_as_bullets(text: str) -> str:
+    if not text:
+        return ""
+    lines = text.strip().split('\n')
+    bullet_lines = []
+    for line in lines:
+        line_str = line.strip()
+        if not line_str or line_str.startswith('---'):
+            continue
+        if not line_str.startswith('- ') and not line_str.startswith('* '):
+            clean_line = re.sub(r'^\d+\.\s*', '', line_str).lstrip('>').strip()
+            bullet_lines.append(f"- {clean_line}")
+        else:
+            bullet_lines.append(line_str)
+    return "\n".join(bullet_lines)
+
+# Step 2: Overhaul PDF HTML/CSS Template in generate_pdf_sync
 def generate_pdf_sync(
     role: str,
     themes: str,
@@ -281,10 +291,11 @@ def generate_pdf_sync(
     categories = chart_categories if (chart_categories and len(chart_categories) > 0) else ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support']
     scores = chart_scores if (chart_scores and len(chart_scores) > 0) else [82, 60, 91, 85, 74]
 
+    # 1. Save Graph to Temp File
     plt.figure(figsize=(7, 3.5), dpi=300)
     plt.bar(categories, scores, color='#00d09c')
     plt.ylim(0, 100)
-    plt.title(f'{role} Team: Platform Diagnostics', color='#1a1a1a')
+    plt.title(f'{role} Team: Platform Diagnostics', color='#1a1a1a', fontsize=12, fontweight='bold')
     plt.tight_layout()
     
     temp_dir = tempfile.gettempdir()
@@ -292,40 +303,70 @@ def generate_pdf_sync(
     plt.savefig(chart_path, format='png', transparent=True)
     plt.close()
 
-    themes_html = markdown.markdown(themes) if themes else ""
-    quotes_html = markdown.markdown(quotes) if quotes else ""
-    action_html = markdown.markdown(action_ideas) if action_ideas else ""
+    # Parse and enforce markdown bullet formatting
+    themes_bulleted = format_as_bullets(themes)
+    quotes_bulleted = format_as_bullets(quotes)
+    action_bulleted = format_as_bullets(action_ideas)
 
+    themes_html = markdown.markdown(themes_bulleted)
+    quotes_html = markdown.markdown(quotes_bulleted)
+    action_html = markdown.markdown(action_bulleted)
+
+    # 2. Premium Branded PDF HTML/CSS Template
     pdf_html = f"""
     <html>
     <head>
         <style>
-            body {{ font-family: Helvetica, Arial, sans-serif; color: #1a1a1a; padding: 40px; }}
-            .header {{ border-bottom: 3px solid #00d09c; padding-bottom: 10px; margin-bottom: 30px; }}
-            h1 {{ color: #1a1a1a; font-size: 28px; margin: 0; }}
-            h2.main-title {{ color: #00d09c; font-size: 20px; margin-top: 5px; }}
-            h3.section-title {{ color: #1a1a1a; font-size: 18px; margin-top: 25px; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }}
-            .graph {{ text-align: center; margin: 30px 0; }}
-            img {{ width: 100%; max-width: 500px; display: block; margin: 0 auto; border-radius: 8px; }}
-            .content p, .content li {{ line-height: 1.6; font-size: 14px; margin-bottom: 10px; }}
-            .content blockquote {{ border-left: 4px solid #00d09c; padding-left: 15px; font-style: italic; background: #f8fafc; padding: 10px; margin: 15px 0; }}
+            @page {{ size: A4; margin: 18mm; }}
+            body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; padding: 0; margin: 0; line-height: 1.6; }}
+            
+            /* Branded Logo Header */
+            .header-container {{ border-bottom: 3px solid #00d09c; padding-bottom: 14px; margin-bottom: 22px; }}
+            .brand-logo {{ font-size: 32px; font-weight: 800; color: #00d09c; letter-spacing: -0.5px; margin: 0; display: inline-block; }}
+            .brand-logo-accent {{ font-weight: 300; color: #64748b; font-size: 28px; margin-left: 4px; }}
+            .report-title {{ font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 6px; margin-bottom: 0; text-transform: uppercase; letter-spacing: 0.5px; }}
+            .report-subtitle {{ font-size: 12px; color: #64748b; margin-top: 2px; font-weight: 500; }}
+
+            /* Chart Styling */
+            .graph-container {{ text-align: center; margin: 18px 0; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; }}
+            img {{ width: 100%; max-width: 500px; display: block; margin: 0 auto; border-radius: 6px; }}
+
+            /* Section Headers */
+            h3.section-title {{ font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 20px; margin-bottom: 10px; border-left: 4px solid #00d09c; padding-left: 10px; text-transform: uppercase; letter-spacing: 0.5px; }}
+
+            /* Custom Emerald Bullet Lists */
+            ul {{ margin: 8px 0 16px 0; padding-left: 18px; list-style-type: none; }}
+            ul li {{ position: relative; padding-left: 14px; margin-bottom: 8px; font-size: 13px; color: #334155; line-height: 1.6; }}
+            ul li::before {{ content: "•"; position: absolute; left: 0; color: #00d09c; font-size: 18px; line-height: 1; top: -1px; font-weight: bold; }}
+            ul li strong {{ color: #0f172a; font-weight: 600; }}
+
+            .footer-note {{ margin-top: 28px; border-top: 1px solid #e2e8f0; padding-top: 12px; font-size: 10px; color: #94a3b8; text-align: center; }}
         </style>
     </head>
     <body>
-        <div class="header">
-            <h1>Groww <span style="font-weight: normal; color: #64748b;">pulse</span></h1>
-            <h2 class="main-title">Weekly Insights Report: {role} Team</h2>
+        <div class="header-container">
+            <div class="brand-logo">Groww<span class="brand-logo-accent">pulse</span></div>
+            <div class="report-title">Weekly Insights & Platform Diagnostics Report</div>
+            <div class="report-subtitle">Stakeholder Lens: {role} Team • 100% Zero PII Sanitized</div>
         </div>
-        <div class="graph">
+
+        <div class="graph-container">
             <img src="file://{chart_path}" />
         </div>
+
         <div class="content">
             <h3 class="section-title">Top 3 Themes</h3>
             {themes_html}
+
             <h3 class="section-title">Real User Quotes</h3>
             {quotes_html}
+
             <h3 class="section-title">Action Ideas</h3>
             {action_html}
+        </div>
+
+        <div class="footer-note">
+            Generated automatically by Groww Pulse Insights Engine • Authenticated Executive Export
         </div>
     </body>
     </html>
@@ -345,7 +386,7 @@ def generate_pdf_sync(
         pdf.cell(0, 10, txt=f"Groww pulse - {role} Team Report", ln=1, align="C")
         pdf.ln(5)
         pdf.set_font("Helvetica", size=10)
-        clean_text = (themes + "\n" + quotes + "\n" + action_ideas).replace("**", "").replace("•", "-")
+        clean_text = (themes_bulleted + "\n" + quotes_bulleted + "\n" + action_bulleted).replace("**", "").replace("•", "-")
         for line in clean_text.split("\n"):
             line_str = line.strip().encode('ascii', errors='ignore').decode('ascii')
             if line_str:
@@ -365,9 +406,9 @@ def generate_pdf(
     chart_scores: Optional[List[int]] = None
 ) -> str:
     if not themes:
-        themes = "1. Double SIP AutoPay Mandate Duplication (159 reports)\n2. iOS Candlestick Chart Freezes during Peak F&O\n3. Bank Account & Mandate Validation Stalls (158 reports)"
+        themes = "- **Double SIP AutoPay Mandate Duplication (159 reports)**\n- **iOS Candlestick Chart Freezes during Peak F&O**\n- **Bank Account & Mandate Validation Stalls (158 reports)**"
     if not quotes:
-        quotes = "> \"SIP amount deducted twice this month. User [EMAIL REDACTED] ticket unresolved.\"\n> \"Latest update freezes option charts on iOS. Account [ID REDACTED].\"\n> \"Bank verification stuck for 5 days. Contacted support at [EMAIL REDACTED].\""
+        quotes = "- \"SIP amount deducted twice this month. User [EMAIL REDACTED] ticket unresolved.\"\n- \"Latest update freezes option charts on iOS. Account [ID REDACTED].\"\n- \"Bank verification stuck for 5 days. Contacted support at [EMAIL REDACTED].\""
     if not action_ideas:
         action_ideas = "- **Product/Growth**: Build an automated mandate deduplication engine.\n- **Support**: Establish a 24/7 priority escalation desk.\n- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks."
 
@@ -415,16 +456,11 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "100% Real App Store Reviews + Strict Calendar Time-Gating Engine"
+        "phase": "Redesigned Branded PDF Template + Strict Markdown Bullet Formatting"
     }
 
-# Time-Gated Weeks API Endpoint
 @app.get("/api/weeks")
 def get_all_weeks():
-    """
-    Returns list of all historical (W15, W16, W17) and time-gated future weeks (W18, W19).
-    Updates `is_locked` status dynamically based on current calendar date.
-    """
     sorted_keys = sorted(WEEKS_TIMELINE.keys(), key=lambda x: int(x))
     weeks_list = []
     
@@ -466,7 +502,6 @@ def get_real_reviews(week_id: Optional[str] = "17", limit: int = 50):
             detail=f"Week {week_id} review dataset is chronologically time-gated and will unlock on {unlock_date}."
         )
         
-    # Return 100% real sanitized store reviews
     real_sample = REAL_REVIEWS_DF.head(limit).to_dict(orient="records")
     return {
         "status": "success",
@@ -545,8 +580,8 @@ async def send_pulse_email(request: SendEmailRequest):
         )
 
     try:
-        themes_input = request.themes if request.themes else "1. Double SIP AutoPay Mandate Duplication\n2. iOS Candlestick Chart Freezes\n3. Bank Account Validation Stalls"
-        quotes_input = request.quotes if request.quotes else "> \"SIP amount deducted twice this month.\""
+        themes_input = request.themes if request.themes else "- **Double SIP AutoPay Mandate Duplication**\n- **iOS Candlestick Chart Freezes**\n- **Bank Account Validation Stalls**"
+        quotes_input = request.quotes if request.quotes else "- \"SIP amount deducted twice this month.\""
         action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
 
         pdf_path = await asyncio.to_thread(
@@ -559,9 +594,13 @@ async def send_pulse_email(request: SendEmailRequest):
             request.chart_scores
         )
         
-        themes_html = markdown.markdown(themes_input)
-        quotes_html = markdown.markdown(quotes_input)
-        action_ideas_html = markdown.markdown(action_input)
+        themes_bulleted = format_as_bullets(themes_input)
+        quotes_bulleted = format_as_bullets(quotes_input)
+        action_bulleted = format_as_bullets(action_input)
+
+        themes_html = markdown.markdown(themes_bulleted)
+        quotes_html = markdown.markdown(quotes_bulleted)
+        action_ideas_html = markdown.markdown(action_bulleted)
 
         email_html_body = f"""<!DOCTYPE html>
 <html>
@@ -571,13 +610,16 @@ async def send_pulse_email(request: SendEmailRequest):
     body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }}
     .email-container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }}
     .email-header {{ background-color: #1a1a1a; padding: 20px 24px; border-bottom: 3px solid #00d09c; }}
-    .brand-title {{ font-size: 22px; font-weight: bold; color: #ffffff; margin: 0; letter-spacing: -0.5px; }}
-    .brand-accent {{ color: #00d09c; font-weight: 300; text-transform: lowercase; font-size: 18px; margin-left: 4px; }}
+    .brand-title {{ font-size: 24px; font-weight: 800; color: #00d09c; margin: 0; letter-spacing: -0.5px; }}
+    .brand-accent {{ color: #ffffff; font-weight: 300; font-size: 20px; margin-left: 4px; }}
     .email-body {{ padding: 24px; font-size: 13px; line-height: 1.6; color: #334155; }}
     .greeting {{ font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 8px; }}
     .punchy-intro {{ font-size: 13px; color: #64748b; margin-bottom: 16px; font-weight: 500; }}
     .report-card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 16px 0; color: #1e293b; }}
-    .section-title {{ color: #1a1a1a; font-size: 18px; font-weight: bold; margin-top: 20px; margin-bottom: 8px; border-bottom: 2px solid #00d09c; padding-bottom: 4px; }}
+    .section-title {{ color: #0f172a; font-size: 14px; font-weight: 700; margin-top: 18px; margin-bottom: 8px; border-left: 3px solid #00d09c; padding-left: 8px; text-transform: uppercase; }}
+    ul {{ margin: 6px 0; padding-left: 16px; list-style-type: none; }}
+    ul li {{ position: relative; padding-left: 12px; margin-bottom: 6px; font-size: 13px; color: #334155; }}
+    ul li::before {{ content: "•"; position: absolute; left: 0; color: #00d09c; font-weight: bold; }}
     .attachment-note {{ background: rgba(0, 208, 156, 0.1); border: 1px solid rgba(0, 208, 156, 0.3); color: #008765; padding: 12px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-top: 18px; text-align: center; }}
     .email-footer {{ background: #f8fafc; padding: 14px; font-size: 11px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; }}
   </style>
@@ -592,13 +634,13 @@ async def send_pulse_email(request: SendEmailRequest):
       <div class="punchy-intro">Here is your visual weekly pulse report tailored for the {request.role} team.</div>
       
       <div class="report-card">
-        <h3 class="section-title">Top 3 Themes</h3>
+        <div class="section-title">Top 3 Themes</div>
         <div>{themes_html}</div>
 
-        <h3 class="section-title">Real User Quotes</h3>
-        <div style="font-style: italic;">{quotes_html}</div>
+        <div class="section-title">Real User Quotes</div>
+        <div>{quotes_html}</div>
 
-        <h3 class="section-title">Action Ideas</h3>
+        <div class="section-title">Action Ideas</div>
         <div>{action_ideas_html}</div>
       </div>
 
