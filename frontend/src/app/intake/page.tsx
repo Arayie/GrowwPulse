@@ -21,13 +21,23 @@ export default function IntakePage() {
     setIsSubmitting(true);
     setErrorMsg('');
 
-    // Role-curated data UI payload matching exact screen rendering
+    // Dynamic role-curated chart scores matching UI state variables
+    const chartCategories = ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support'];
+    const chartScores = role.includes('Support') 
+      ? [78, 55, 85, 80, 68] 
+      : role.includes('Executive') 
+      ? [82, 60, 91, 85, 74] 
+      : [88, 62, 90, 84, 76];
+
+    // Role-curated data UI payload with dynamic graph arrays
     const payload = {
       role,
       email,
       themes: "1. Double SIP AutoPay Mandate Duplication (159 reports)\n2. iOS Candlestick Chart Freezes during Peak F&O\n3. Bank Account & Mandate Validation Stalls (158 reports)",
       quotes: "\"SIP amount deducted twice this month. Double deduction happened without reason. User [EMAIL REDACTED] ticket unresolved.\"\n\"Latest update freezes option charts on iOS. Screen goes blank during fast market moves for account [ID REDACTED].\"\n\"Bank verification stuck for 5 days. Cannot set up AutoPay mandate. Contacted support at [EMAIL REDACTED].\"",
-      action_ideas: "Product/Growth: Build an automated mandate deduplication engine in payment backend services.\nSupport: Deploy hotfix patch optimizing iOS chart rendering pipeline and WebSocket buffers.\nLeadership: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks."
+      action_ideas: "Product/Growth: Build an automated mandate deduplication engine in payment backend services.\nSupport: Deploy hotfix patch optimizing iOS chart rendering pipeline and WebSocket buffers.\nLeadership: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks.",
+      chart_categories: chartCategories,
+      chart_scores: chartScores
     };
 
     try {
@@ -149,7 +159,7 @@ export default function IntakePage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 rounded-xl bg-[#00d09c] hover:bg-[#00b386] text-slate-900 font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3.5 rounded-xl bg-[#00d09c] hover:bg-[#00b386] text-slate-900 font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer touch-manipulation active:scale-95"
               >
                 {isSubmitting ? (
                   <>

@@ -7,7 +7,7 @@ import numpy as np
 import base64
 import smtplib
 import pandas as pd
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, List
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,7 +37,7 @@ from email.message import EmailMessage
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with File URI Chart Rendering & Hardcoded Section Titles")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Dynamic PDF Chart Sizing & Metrics")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -171,13 +171,26 @@ def cluster_reviews(df: pd.DataFrame, num_clusters: int = 5) -> Tuple[pd.DataFra
     formatted_summary = "\n".join(cluster_summary_lines)
     return df_clustered, formatted_summary
 
-# Exact generate_pdf_sync implementation
-def generate_pdf_sync(role: str, themes: str, quotes: str, action_ideas: str) -> str:
-    # 1. Save Graph to Temp File (Bypasses Base64 blocking)
+# Dynamic Matplotlib Graph PDF Generator
+def generate_pdf_sync(
+    role: str,
+    themes: str,
+    quotes: str,
+    action_ideas: str,
+    chart_categories: Optional[List[str]] = None,
+    chart_scores: Optional[List[int]] = None
+) -> str:
+    """
+    Renders Matplotlib graph using dynamic chart_categories and chart_scores passed from UI.
+    Sets plt.ylim(0, 100) for consistent week-over-week scaling.
+    """
+    categories = chart_categories if (chart_categories and len(chart_categories) > 0) else ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support']
+    scores = chart_scores if (chart_scores and len(chart_scores) > 0) else [82, 60, 91, 85, 74]
+
+    # 1. Save Dynamic Graph to Temp File
     plt.figure(figsize=(7, 3.5), dpi=300)
-    categories = ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support']
-    scores = [82, 60, 91, 85, 74]
     plt.bar(categories, scores, color='#00d09c')
+    plt.ylim(0, 100)
     plt.title(f'{role} Team: Platform Diagnostics', color='#1a1a1a')
     plt.tight_layout()
     
@@ -256,7 +269,9 @@ def generate_pdf(
     charts_b64: Optional[Dict[str, str]] = None,
     themes: Optional[str] = None,
     quotes: Optional[str] = None,
-    action_ideas: Optional[str] = None
+    action_ideas: Optional[str] = None,
+    chart_categories: Optional[List[str]] = None,
+    chart_scores: Optional[List[int]] = None
 ) -> str:
     if not themes:
         themes = "1. Double SIP AutoPay Mandate Duplication (159 reports)\n2. iOS Candlestick Chart Freezes during Peak F&O\n3. Bank Account & Mandate Validation Stalls (158 reports)"
@@ -265,7 +280,7 @@ def generate_pdf(
     if not action_ideas:
         action_ideas = "- **Product/Growth**: Build an automated mandate deduplication engine.\n- **Support**: Establish a 24/7 priority escalation desk.\n- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks."
 
-    return generate_pdf_sync(role, themes, quotes, action_ideas)
+    return generate_pdf_sync(role, themes, quotes, action_ideas, chart_categories, chart_scores)
 
 def generate_pdf_charts(role: str = "Product") -> Dict[str, str]:
     return {"graph_base64": ""}
@@ -294,19 +309,25 @@ class WeeklyPulseRequest(BaseModel):
 class SanitizeRequest(BaseModel):
     raw_text: str
 
+# Step 1: Updated Pydantic Model with Dynamic Chart Data Fields
 class SendEmailRequest(BaseModel):
     role: str
     email: str
     themes: Optional[str] = None
     quotes: Optional[str] = None
     action_ideas: Optional[str] = None
+    chart_categories: Optional[List[str]] = None
+    chart_scores: Optional[List[int]] = None
+
+# Alias for PulseRequest
+PulseRequest = SendEmailRequest
 
 @app.get("/")
 def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "File URI Chart Rendering + Hardcoded Section Titles"
+        "phase": "Dynamic Matplotlib Chart Categories & Scores from UI State"
     }
 
 @app.post("/test-sanitization")
@@ -377,10 +398,10 @@ async def send_pulse_email(request: SendEmailRequest):
             request.role,
             themes_input,
             quotes_input,
-            action_input
+            action_input,
+            request.chart_categories,
+            request.chart_scores
         )
-        
-        bold_header_style = 'font-weight: bold; font-size: 20px; color: #1a1a1a; margin-top: 20px; margin-bottom: 8px; border-bottom: 2px solid #00d09c; padding-bottom: 4px;'
         
         themes_html = markdown.markdown(themes_input)
         quotes_html = markdown.markdown(quotes_input)
