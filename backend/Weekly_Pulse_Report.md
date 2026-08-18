@@ -1,14 +1,14 @@
 ## Top 3 Themes
-1. **Double SIP AutoPay Mandate Duplication**: Recurring payment microservice executing SIP mandates twice in a month without authorization.
-2. **iOS Candlestick Chart Freezes during Peak F&O**: Post-update UI regression causing charts to freeze on iOS during opening market hours.
-3. **Bank Account & Mandate Validation Stalls**: Multi-day delays in bank account verification blocking fund deposits.
+1. **Public Store Brand & Rating Risk**: Surge in 1-star App Store/Play Store reviews impacting public rating due to payment issues.
+2. **Partner Bank Payment Gateway Latency**: Banking partner gateway timeouts causing transaction processing stalls and refund delays.
+3. **High-LTV F&O Trader Churn Risk**: Peak trading hour latencies causing user dissatisfaction among active traders.
 
 ## Real User Quotes
-> "SIP amount deducted twice this month. Double deduction happened without any reason. User [EMAIL REDACTED] ticket unresolved."
-> "Latest update freezes option charts on iOS. Screen goes blank during fast market moves for account [ID REDACTED]."
-> "Bank verification stuck for 5 days. Cannot set up AutoPay mandate. Contacted support at [EMAIL REDACTED]."
+> "Order failed twice during market peak at 9:15 AM! Stop-loss didn’t trigger. Account [ID REDACTED] unresolved."
+> "Groww used to be great but latest payment issues are terrible. Moving my portfolio to another broker."
+> "Double deduction happened twice. Unacceptable for a financial app managing user funds. User [EMAIL REDACTED]."
 
 ## Action Ideas
-- **Product/Growth**: Build an automated mandate deduplication engine in payment backend services to block double debits.
-- **Support**: Deploy hotfix patch optimizing iOS chart rendering pipeline and WebSocket data stream buffers.
-- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks.
+- **Product/Growth**: Authorize emergency engineering resource allocation to scale peak opening-hour trading engine capacity.
+- **Support**: Audit AutoPay mandate clearing mechanisms against regulatory RBI guidelines.
+- **Leadership**: Renegotiate SLA parameters and instant refund webhook requirements with primary payment gateway partners.
