@@ -6,7 +6,6 @@ import tempfile
 import traceback
 import numpy as np
 import base64
-import smtplib
 import pandas as pd
 from datetime import datetime, date
 from typing import Optional, Tuple, Dict, List
@@ -15,6 +14,9 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+
+# Import Resend SDK
+import resend
 
 # Load environment variables
 load_dotenv()
@@ -32,14 +34,13 @@ import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 
-# Export & Email libraries
+# Export libraries
 import markdown
-from email.message import EmailMessage
 
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Robust Traceback Error Trapping & Granular Step Logging")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Resend HTTP API Email Dispatch & Dynamic PDF Exports")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -400,28 +401,40 @@ def generate_pdf(
 
     return generate_pdf_sync(role, themes, quotes, action_ideas, chart_categories, chart_scores)
 
-def send_smtp_dispatch(msg: EmailMessage) -> str:
-    smtp_email = os.environ.get("SMTP_EMAIL")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
-    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.environ.get("SMTP_PORT", 465))
+# Step 2: Resend HTTP API Email Dispatch Function
+def send_resend_email(role: str, target_email: str, email_html_body: str, pdf_path: str) -> str:
+    resend_api_key = os.environ.get("RESEND_API_KEY")
+    if not resend_api_key:
+        raise ValueError(
+            "RESEND_API_KEY environment variable is not set! Please create an account at resend.com, get an API key, and add RESEND_API_KEY to your backend .env file."
+        )
+        
+    resend.api_key = resend_api_key
+    from_email = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
     
-    print(f"[SMTP ENGINE] Connecting to SMTP server {smtp_server}:{smtp_port} (timeout=15s)...")
-    if smtp_email and smtp_password:
-        try:
-            with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15) as server:
-                server.login(smtp_email, smtp_password)
-                server.send_message(msg)
-            print("[SMTP ENGINE] Live Branded HTML email dispatched successfully via SMTP SSL!")
-            return "Live Branded HTML email sent successfully via SMTP!"
-        except Exception as smtp_err:
-            print(f"[SMTP ENGINE ERROR] SMTP dispatch failed/timed out: {str(smtp_err)}")
-            return f"Branded HTML Email drafted & PDF attached (SMTP attempt: {str(smtp_err)})"
-    else:
-        print("[SMTP ENGINE] SMTP credentials not set in .env. Drafted email & PDF ready.")
-        return "Branded HTML Email drafted & PDF generated successfully! (Add SMTP_EMAIL and SMTP_PASSWORD to .env for live sending)"
+    attachments = []
+    if pdf_path and os.path.exists(pdf_path):
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+            attachments.append({
+                "filename": "Weekly_Pulse.pdf",
+                "content": list(pdf_bytes)
+            })
+            
+    params = {
+        "from": from_email,
+        "to": [target_email],
+        "subject": f"Your Groww Pulse Weekly Report - {role} Team",
+        "html": email_html_body,
+        "attachments": attachments
+    }
+    
+    print(f"[RESEND HTTP API] Sending email via Resend HTTP API to '{target_email}' from '{from_email}'...")
+    response = resend.Emails.send(params)
+    print(f"[RESEND HTTP API SUCCESS] Response ID: {response}")
+    return str(response)
 
-# Robust Background Worker Function with Granular Logging & Traceback Error Trapping
+# Step 3: Robust Background Worker Function with Resend Error Trapping
 def process_email_in_background(
     role: str,
     email: str,
@@ -441,7 +454,7 @@ def process_email_in_background(
             chart_categories,
             chart_scores
         )
-        print(f">>> Step 2: PDF generated at {pdf_path}. Connecting to SMTP...")
+        print(f">>> Step 2: PDF generated at {pdf_path}. Connecting to Resend HTTP API...")
         
         themes_bulleted = format_as_bullets(themes)
         quotes_bulleted = format_as_bullets(quotes)
@@ -505,19 +518,7 @@ def process_email_in_background(
 </html>
 """
 
-        msg = EmailMessage()
-        msg['Subject'] = f"Your Groww Pulse Weekly Report - {role} Team"
-        msg['From'] = os.environ.get("SMTP_EMAIL", "pulse-insights@groww.in")
-        msg['To'] = email
-        
-        msg.set_content(email_html_body, subtype='html')
-        
-        if os.path.exists(pdf_path):
-            with open(pdf_path, 'rb') as f:
-                file_data = f.read()
-                msg.add_attachment(file_data, maintype='application', subtype='pdf', filename='Weekly_Pulse.pdf')
-                
-        dispatch_status = send_smtp_dispatch(msg)
+        send_resend_email(role, email, email_html_body, pdf_path)
         print(">>> Step 3: SUCCESS! Email sent.")
     except Exception as e:
         print(f"CRITICAL BACKGROUND TASK FAILURE: {str(e)}")
@@ -548,7 +549,7 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "Robust Background Error Trapping & Granular Step Logging"
+        "phase": "Resend HTTP API Email Dispatch Engine + PDF Attachments"
     }
 
 @app.get("/api/weeks")
@@ -675,7 +676,7 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
     quotes_input = request.quotes if request.quotes else "- \"SIP amount deducted twice this month.\""
     action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
 
-    print(f"[API ENDPOINT] Enqueuing background email task for {request.email} ({request.role} lens)...")
+    print(f"[API ENDPOINT] Enqueuing Resend background email task for {request.email} ({request.role} lens)...")
     background_tasks.add_task(
         process_email_in_background,
         request.role,
@@ -689,7 +690,7 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
 
     return {
         "status": "success",
-        "message": "Email delivery & PDF generation task enqueued successfully in background!",
+        "message": "Email delivery & PDF generation task enqueued successfully via Resend HTTP API!",
         "target_email": request.email,
         "role": request.role,
         "week_id": week_id
