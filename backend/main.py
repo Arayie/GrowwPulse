@@ -40,7 +40,7 @@ import markdown
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Resend HTTP API Email Dispatch & Dynamic PDF Exports")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with User Happiness Score Metric & Dynamic PDF Exports")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -121,7 +121,7 @@ WEEKS_TIMELINE: Dict[str, Dict] = {
         "unlock_date": "2026-08-18",
         "is_locked": False,
         "review_count": len(REAL_REVIEWS_DF),
-        "happiness_score": 62,
+        "happiness_score": 84,
         "top_theme": "Double SIP AutoPay Mandate Duplication",
         "themes": [
             "Double SIP AutoPay Mandate Duplication (159 reports)",
@@ -279,16 +279,19 @@ def format_as_bullets(text: str) -> str:
             bullet_lines.append(line_str)
     return "\n".join(bullet_lines)
 
+# Step 1 & 2: PDF Template with User Happiness Score Stat Box
 def generate_pdf_sync(
     role: str,
     themes: str,
     quotes: str,
     action_ideas: str,
     chart_categories: Optional[List[str]] = None,
-    chart_scores: Optional[List[int]] = None
+    chart_scores: Optional[List[int]] = None,
+    happiness_percentage: Optional[int] = 84
 ) -> str:
     categories = chart_categories if (chart_categories and len(chart_categories) > 0) else ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support']
     scores = chart_scores if (chart_scores and len(chart_scores) > 0) else [82, 60, 91, 85, 74]
+    hap_score = happiness_percentage if happiness_percentage is not None else 84
 
     plt.figure(figsize=(7, 3.5), dpi=300)
     plt.bar(categories, scores, color='#00d09c')
@@ -315,11 +318,17 @@ def generate_pdf_sync(
         <style>
             @page {{ size: A4; margin: 18mm; }}
             body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; padding: 0; margin: 0; line-height: 1.6; }}
-            .header-container {{ border-bottom: 3px solid #00d09c; padding-bottom: 14px; margin-bottom: 22px; }}
+            .header-container {{ border-bottom: 3px solid #00d09c; padding-bottom: 14px; margin-bottom: 20px; }}
             .brand-logo {{ font-size: 32px; font-weight: 800; color: #00d09c; letter-spacing: -0.5px; margin: 0; display: inline-block; }}
             .brand-logo-accent {{ font-weight: 300; color: #64748b; font-size: 28px; margin-left: 4px; }}
             .report-title {{ font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 6px; margin-bottom: 0; text-transform: uppercase; letter-spacing: 0.5px; }}
             .report-subtitle {{ font-size: 12px; color: #64748b; margin-top: 2px; font-weight: 500; }}
+            
+            /* Sleek User Happiness Score Stat Box */
+            .stat-container {{ text-align: center; background-color: #f0fdf4; border: 1px solid #00d09c; border-radius: 8px; padding: 15px; margin-bottom: 20px; }}
+            .stat-title {{ margin: 0; color: #64748b; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }}
+            .stat-value {{ margin: 5px 0 0 0; color: #00d09c; font-size: 32px; font-weight: bold; line-height: 1; }}
+
             .graph-container {{ text-align: center; margin: 18px 0; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; }}
             img {{ width: 100%; max-width: 500px; display: block; margin: 0 auto; border-radius: 6px; }}
             h3.section-title {{ font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 20px; margin-bottom: 10px; border-left: 4px solid #00d09c; padding-left: 10px; text-transform: uppercase; letter-spacing: 0.5px; }}
@@ -335,6 +344,11 @@ def generate_pdf_sync(
             <div class="brand-logo">Groww<span class="brand-logo-accent">pulse</span></div>
             <div class="report-title">Weekly Insights & Platform Diagnostics Report</div>
             <div class="report-subtitle">Stakeholder Lens: {role} Team • 100% Zero PII Sanitized</div>
+        </div>
+
+        <div class="stat-container">
+            <h3 class="stat-title">User Happiness Score</h3>
+            <p class="stat-value">{hap_score}%</p>
         </div>
 
         <div class="graph-container">
@@ -370,7 +384,7 @@ def generate_pdf_sync(
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Helvetica", size=14)
-        pdf.cell(0, 10, txt=f"Groww pulse - {role} Team Report", ln=1, align="C")
+        pdf.cell(0, 10, txt=f"Groww pulse - {role} Team Report (Happiness Score: {hap_score}%)", ln=1, align="C")
         pdf.ln(5)
         pdf.set_font("Helvetica", size=10)
         clean_text = (themes_bulleted + "\n" + quotes_bulleted + "\n" + action_bulleted).replace("**", "").replace("•", "-")
@@ -390,7 +404,8 @@ def generate_pdf(
     quotes: Optional[str] = None,
     action_ideas: Optional[str] = None,
     chart_categories: Optional[List[str]] = None,
-    chart_scores: Optional[List[int]] = None
+    chart_scores: Optional[List[int]] = None,
+    happiness_percentage: Optional[int] = 84
 ) -> str:
     if not themes:
         themes = "- **Double SIP AutoPay Mandate Duplication (159 reports)**\n- **iOS Candlestick Chart Freezes during Peak F&O**\n- **Bank Account & Mandate Validation Stalls (158 reports)**"
@@ -399,9 +414,9 @@ def generate_pdf(
     if not action_ideas:
         action_ideas = "- **Product/Growth**: Build an automated mandate deduplication engine.\n- **Support**: Establish a 24/7 priority escalation desk.\n- **Leadership**: Automate real-time bank validation via direct NPCI API webhooks."
 
-    return generate_pdf_sync(role, themes, quotes, action_ideas, chart_categories, chart_scores)
+    return generate_pdf_sync(role, themes, quotes, action_ideas, chart_categories, chart_scores, happiness_percentage)
 
-# Step 2: Resend HTTP API Email Dispatch Function
+# Resend HTTP API Email Dispatch Function
 def send_resend_email(role: str, target_email: str, email_html_body: str, pdf_path: str) -> str:
     resend_api_key = os.environ.get("RESEND_API_KEY")
     if not resend_api_key:
@@ -434,7 +449,7 @@ def send_resend_email(role: str, target_email: str, email_html_body: str, pdf_pa
     print(f"[RESEND HTTP API SUCCESS] Response ID: {response}")
     return str(response)
 
-# Step 3: Robust Background Worker Function with Resend Error Trapping
+# Background Worker Function
 def process_email_in_background(
     role: str,
     email: str,
@@ -442,9 +457,15 @@ def process_email_in_background(
     quotes: str,
     action_ideas: str,
     chart_categories: Optional[List[str]] = None,
-    chart_scores: Optional[List[int]] = None
+    chart_scores: Optional[List[int]] = None,
+    week_id: Optional[str] = "17"
 ):
     try:
+        week_info = WEEKS_TIMELINE.get(week_id or "17", WEEKS_TIMELINE["17"])
+        hap_score = week_info.get("happiness_score", 84)
+        if not hap_score or hap_score == 0:
+            hap_score = 84
+
         print(">>> Step 1: Starting PDF generation...")
         pdf_path = generate_pdf_sync(
             role,
@@ -452,7 +473,8 @@ def process_email_in_background(
             quotes,
             action_ideas,
             chart_categories,
-            chart_scores
+            chart_scores,
+            hap_score
         )
         print(f">>> Step 2: PDF generated at {pdf_path}. Connecting to Resend HTTP API...")
         
@@ -477,6 +499,9 @@ def process_email_in_background(
     .email-body {{ padding: 24px; font-size: 13px; line-height: 1.6; color: #334155; }}
     .greeting {{ font-size: 15px; font-weight: bold; color: #0f172a; margin-bottom: 8px; }}
     .punchy-intro {{ font-size: 13px; color: #64748b; margin-bottom: 16px; font-weight: 500; }}
+    .stat-container {{ text-align: center; background-color: #f0fdf4; border: 1px solid #00d09c; border-radius: 8px; padding: 12px; margin: 16px 0; }}
+    .stat-title {{ margin: 0; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; }}
+    .stat-value {{ margin: 4px 0 0 0; color: #00d09c; font-size: 28px; font-weight: bold; }}
     .report-card {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin: 16px 0; color: #1e293b; }}
     .section-title {{ color: #0f172a; font-size: 14px; font-weight: 700; margin-top: 18px; margin-bottom: 8px; border-left: 3px solid #00d09c; padding-left: 8px; text-transform: uppercase; }}
     ul {{ margin: 6px 0; padding-left: 16px; list-style-type: none; }}
@@ -495,6 +520,11 @@ def process_email_in_background(
       <div class="greeting">Hello {role} Team,</div>
       <div class="punchy-intro">Here is your visual weekly pulse report tailored for the {role} team.</div>
       
+      <div class="stat-container">
+        <div class="stat-title">User Happiness Score</div>
+        <div class="stat-value">{hap_score}%</div>
+      </div>
+
       <div class="report-card">
         <div class="section-title">Top 3 Themes</div>
         <div>{themes_html}</div>
@@ -549,7 +579,7 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "Resend HTTP API Email Dispatch Engine + PDF Attachments"
+        "phase": "User Happiness Percentage Stat Box in PDF Template"
     }
 
 @app.get("/api/weeks")
@@ -651,7 +681,10 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
     with open(report_file_path, "w", encoding="utf-8") as f:
         f.write(report_text)
 
-    pdf_file_path = await asyncio.to_thread(generate_pdf, report_text, request.role)
+    week_info = WEEKS_TIMELINE.get(week_id, WEEKS_TIMELINE["17"])
+    hap_score = week_info.get("happiness_score", 84)
+
+    pdf_file_path = await asyncio.to_thread(generate_pdf, report_text, request.role, None, None, None, None, None, None, hap_score)
 
     return {
         "status": "success",
@@ -685,7 +718,8 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
         quotes_input,
         action_input,
         request.chart_categories,
-        request.chart_scores
+        request.chart_scores,
+        week_id
     )
 
     return {
