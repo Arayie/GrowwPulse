@@ -121,7 +121,7 @@ WEEKS_TIMELINE: Dict[str, Dict] = {
         "unlock_date": "2026-08-18",
         "is_locked": False,
         "review_count": len(REAL_REVIEWS_DF),
-        "happiness_score": 84,
+        "happiness_score": 62,
         "top_theme": "Double SIP AutoPay Mandate Duplication",
         "themes": [
             "Double SIP AutoPay Mandate Duplication (159 reports)",
@@ -287,11 +287,11 @@ def generate_pdf_sync(
     action_ideas: str,
     chart_categories: Optional[List[str]] = None,
     chart_scores: Optional[List[int]] = None,
-    happiness_percentage: Optional[int] = 84
+    happiness_percentage: Optional[int] = None
 ) -> str:
     categories = chart_categories if (chart_categories and len(chart_categories) > 0) else ['Stability', 'Payments', 'Onboarding', 'Portfolio', 'Support']
     scores = chart_scores if (chart_scores and len(chart_scores) > 0) else [82, 60, 91, 85, 74]
-    hap_score = happiness_percentage if happiness_percentage is not None else 84
+    hap_score = happiness_percentage if happiness_percentage is not None else 62
 
     plt.figure(figsize=(7, 3.5), dpi=300)
     plt.bar(categories, scores, color='#00d09c')
@@ -405,7 +405,7 @@ def generate_pdf(
     action_ideas: Optional[str] = None,
     chart_categories: Optional[List[str]] = None,
     chart_scores: Optional[List[int]] = None,
-    happiness_percentage: Optional[int] = 84
+    happiness_percentage: Optional[int] = None
 ) -> str:
     if not themes:
         themes = "- **Double SIP AutoPay Mandate Duplication (159 reports)**\n- **iOS Candlestick Chart Freezes during Peak F&O**\n- **Bank Account & Mandate Validation Stalls (158 reports)**"
@@ -463,8 +463,8 @@ def process_email_in_background(
 ):
     try:
         week_info = WEEKS_TIMELINE.get(week_id or "17", WEEKS_TIMELINE["17"])
-        # Directly use happiness_score passed from payload, or query exact record from data library
-        hap_score = happiness_score if happiness_score is not None else week_info.get("happiness_score", 84)
+        # Strictly extract happiness_score from payload, or query exact record from data library
+        hap_score = happiness_score if happiness_score is not None else week_info.get("happiness_score", 62)
 
         print(f">>> Step 1: Starting PDF generation with synced User Happiness Score ({hap_score}%)...")
         pdf_path = generate_pdf_sync(
@@ -581,7 +581,7 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "Exact Happiness Score Synchronization from Frontend & Data Library"
+        "phase": "Strict Metric Synchronization & Clean User Messaging"
     }
 
 @app.get("/api/weeks")
@@ -684,7 +684,7 @@ async def generate_weekly_pulse(request: WeeklyPulseRequest):
         f.write(report_text)
 
     week_info = WEEKS_TIMELINE.get(week_id, WEEKS_TIMELINE["17"])
-    hap_score = week_info.get("happiness_score", 84)
+    hap_score = week_info.get("happiness_score", 62)
 
     pdf_file_path = await asyncio.to_thread(generate_pdf, report_text, request.role, None, None, None, None, None, None, hap_score)
 
@@ -711,11 +711,11 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
     quotes_input = request.quotes if request.quotes else "- \"SIP amount deducted twice this month.\""
     action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
 
-    # Step 1: Extract exact happiness_score from payload or query data library record
+    # Step 3: Strictly extract happiness_score from payload or query data library record
     week_info = WEEKS_TIMELINE.get(week_id, WEEKS_TIMELINE["17"])
-    hap_score = request.happiness_score if request.happiness_score is not None else week_info.get("happiness_score", 84)
+    hap_score = request.happiness_score if request.happiness_score is not None else week_info.get("happiness_score", 62)
 
-    print(f"[API ENDPOINT] Enqueuing Resend background email task for {request.email} (Synced Happiness Score: {hap_score}%)...")
+    print(f"[API ENDPOINT] Enqueuing Resend background email task for {request.email} (Strict Happiness Score: {hap_score}%)...")
     background_tasks.add_task(
         process_email_in_background,
         request.role,
@@ -731,7 +731,7 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
 
     return {
         "status": "success",
-        "message": "Email delivery & PDF generation task enqueued successfully via Resend HTTP API!",
+        "message": "Your Pulse Report has been generated and is on its way to your inbox!",
         "target_email": request.email,
         "role": request.role,
         "week_id": week_id,

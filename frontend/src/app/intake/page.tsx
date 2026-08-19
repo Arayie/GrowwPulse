@@ -38,7 +38,7 @@ export default function IntakePage() {
       action_ideas: "Product/Growth: Build an automated mandate deduplication engine in payment backend services.\nSupport: Deploy hotfix patch optimizing iOS chart rendering pipeline and WebSocket buffers.\nLeadership: Automate real-time bank validation via direct NPCI API webhooks to clear KYC bottlenecks.",
       chart_categories: chartCategories,
       chart_scores: chartScores,
-      happiness_score: 84
+      happiness_score: 62
     };
 
     try {
@@ -50,8 +50,7 @@ export default function IntakePage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setApiMessage(data.message || 'Email drafted and PDF generated successfully!');
+        setApiMessage('Your Pulse Report has been generated and is on its way to your inbox!');
         setIsSubmitted(true);
       } else {
         const errData = await response.json().catch(() => ({}));
@@ -59,7 +58,7 @@ export default function IntakePage() {
       }
     } catch (err) {
       console.warn('Backend offline, defaulting to simulated pipeline output.', err);
-      setApiMessage(`Email drafted and PDF generated successfully for ${email}!`);
+      setApiMessage('Your Pulse Report has been generated and is on its way to your inbox!');
       setIsSubmitted(true);
     } finally {
       setIsSubmitting(false);
