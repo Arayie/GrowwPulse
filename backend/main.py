@@ -40,7 +40,7 @@ import markdown
 # Import Advanced PII Sanitizer
 from sanitizer import AdvancedPIIScrubber
 
-app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with User Happiness Score Metric & Dynamic PDF Exports")
+app = FastAPI(title="Groww Pulse API", description="FastAPI Backend with Direct Frontend Happiness Score Synchronization")
 
 # Add CORS Middleware
 app.add_middleware(
@@ -279,7 +279,7 @@ def format_as_bullets(text: str) -> str:
             bullet_lines.append(line_str)
     return "\n".join(bullet_lines)
 
-# Step 1 & 2: PDF Template with User Happiness Score Stat Box
+# PDF Template with Synced Frontend User Happiness Score
 def generate_pdf_sync(
     role: str,
     themes: str,
@@ -449,7 +449,7 @@ def send_resend_email(role: str, target_email: str, email_html_body: str, pdf_pa
     print(f"[RESEND HTTP API SUCCESS] Response ID: {response}")
     return str(response)
 
-# Background Worker Function
+# Background Worker Function with Synced Happiness Metric Injection
 def process_email_in_background(
     role: str,
     email: str,
@@ -458,15 +458,15 @@ def process_email_in_background(
     action_ideas: str,
     chart_categories: Optional[List[str]] = None,
     chart_scores: Optional[List[int]] = None,
-    week_id: Optional[str] = "17"
+    week_id: Optional[str] = "17",
+    happiness_score: Optional[int] = None
 ):
     try:
         week_info = WEEKS_TIMELINE.get(week_id or "17", WEEKS_TIMELINE["17"])
-        hap_score = week_info.get("happiness_score", 84)
-        if not hap_score or hap_score == 0:
-            hap_score = 84
+        # Directly use happiness_score passed from payload, or query exact record from data library
+        hap_score = happiness_score if happiness_score is not None else week_info.get("happiness_score", 84)
 
-        print(">>> Step 1: Starting PDF generation...")
+        print(f">>> Step 1: Starting PDF generation with synced User Happiness Score ({hap_score}%)...")
         pdf_path = generate_pdf_sync(
             role,
             themes,
@@ -562,6 +562,7 @@ class WeeklyPulseRequest(BaseModel):
 class SanitizeRequest(BaseModel):
     raw_text: str
 
+# Pydantic Model updated with optional happiness_score payload field
 class SendEmailRequest(BaseModel):
     role: str
     email: str
@@ -571,6 +572,7 @@ class SendEmailRequest(BaseModel):
     chart_categories: Optional[List[str]] = None
     chart_scores: Optional[List[int]] = None
     week_id: Optional[str] = "17"
+    happiness_score: Optional[int] = None
 
 PulseRequest = SendEmailRequest
 
@@ -579,7 +581,7 @@ def read_root():
     return {
         "message": "Groww Pulse API is running",
         "status": "active",
-        "phase": "User Happiness Percentage Stat Box in PDF Template"
+        "phase": "Exact Happiness Score Synchronization from Frontend & Data Library"
     }
 
 @app.get("/api/weeks")
@@ -709,7 +711,11 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
     quotes_input = request.quotes if request.quotes else "- \"SIP amount deducted twice this month.\""
     action_input = request.action_ideas if request.action_ideas else "- **Product/Growth**: Build mandate deduplication engine."
 
-    print(f"[API ENDPOINT] Enqueuing Resend background email task for {request.email} ({request.role} lens)...")
+    # Step 1: Extract exact happiness_score from payload or query data library record
+    week_info = WEEKS_TIMELINE.get(week_id, WEEKS_TIMELINE["17"])
+    hap_score = request.happiness_score if request.happiness_score is not None else week_info.get("happiness_score", 84)
+
+    print(f"[API ENDPOINT] Enqueuing Resend background email task for {request.email} (Synced Happiness Score: {hap_score}%)...")
     background_tasks.add_task(
         process_email_in_background,
         request.role,
@@ -719,7 +725,8 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
         action_input,
         request.chart_categories,
         request.chart_scores,
-        week_id
+        week_id,
+        hap_score
     )
 
     return {
@@ -727,5 +734,6 @@ async def send_pulse_email(request: SendEmailRequest, background_tasks: Backgrou
         "message": "Email delivery & PDF generation task enqueued successfully via Resend HTTP API!",
         "target_email": request.email,
         "role": request.role,
-        "week_id": week_id
+        "week_id": week_id,
+        "happiness_score": hap_score
     }
