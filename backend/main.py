@@ -410,7 +410,7 @@ def send_resend_email(role: str, target_email: str, email_html_body: str, pdf_pa
         )
         
     resend.api_key = resend_api_key
-    from_email = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+    from_email = "Groww Pulse <onboarding@resend.dev>"
     
     attachments = []
     if pdf_path and os.path.exists(pdf_path):
